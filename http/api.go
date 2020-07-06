@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/actumn/searchgoose/cluster"
 	"github.com/actumn/searchgoose/index"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/gin-gonic/gin"
@@ -11,11 +12,7 @@ type Bootstrap struct {
 	r *gin.Engine
 }
 
-func New() *Bootstrap {
-	r := gin.Default()
-	indexMapping := mapping.NewIndexMapping()
-	i, _ := index.NewIndex("./examples", indexMapping)
-
+func misc(r *gin.Engine) {
 	r.GET("/", func(context *gin.Context) {
 		context.JSON(200, gin.H{
 			"name": "searchgoose",
@@ -23,6 +20,65 @@ func New() *Bootstrap {
 				"number": "0.0.0",
 			},
 		})
+	})
+	r.GET("/_nodes", func(context *gin.Context) {
+		context.JSON(200, gin.H{
+			"nodes": map[string]interface{}{
+				cluster.GenerateNodeId(): map[string]interface{}{
+					"ip":      "127.0.0.1",
+					"version": "7.8.0",
+					"http": map[string]interface{}{
+						"public_address": "127.0.0.1:8080",
+					},
+				},
+			},
+		})
+	})
+	r.GET("/_xpack", func(context *gin.Context) {
+		context.JSON(200, gin.H{
+			"license": map[string]interface{}{
+				"uid":    "d0309419-2f93-4b56-95e1-97c0c6415956",
+				"type":   "basic",
+				"mode":   "basic",
+				"status": "active",
+			},
+		})
+	})
+
+	r.NoRoute(func(context *gin.Context) {
+		context.JSON(404, gin.H{
+			"error": map[string]interface{}{
+				"root_capuse": []map[string]interface{}{
+					{
+						"type":          "index_not_found_exception",
+						"reason":        "no such index [.kibana]",
+						"resource.type": "index_or_alias",
+						"resource.id":   ".kibana",
+						"index_uuid":    "_na_",
+						"index":         ".kibana",
+					},
+				},
+				"type":          "index_not_found_exception",
+				"reason":        "no such index [.kibana]",
+				"resource.type": "index_or_alias",
+				"resource.id":   ".kibana",
+				"index_uuid":    "_na_",
+				"index":         ".kibana",
+			},
+			"status": 404,
+		})
+	})
+}
+
+func New() *Bootstrap {
+	r := gin.Default()
+	indexMapping := mapping.NewIndexMapping()
+	i, _ := index.NewIndex("./examples", indexMapping)
+
+	misc(r)
+
+	r.GET("/_cat/templates/:template", func(context *gin.Context) {
+		context.JSON(200, []interface{}{})
 	})
 
 	r.GET("/_doc/:id", func(context *gin.Context) {
