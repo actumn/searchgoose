@@ -1,28 +1,44 @@
 package http
 
 import (
+	"encoding/json"
 	"github.com/actumn/searchgoose/cluster"
 	"github.com/actumn/searchgoose/index"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/gin-gonic/gin"
+	"github.com/valyala/fasthttp"
+	"log"
 )
 
 type Bootstrap struct {
-	i *index.Index
-	r *gin.Engine
+	s *fasthttp.Server
 }
 
-func misc(r *gin.Engine) {
-	r.GET("/", func(context *gin.Context) {
-		context.JSON(200, gin.H{
+var (
+	strContentType     = []byte("Content-Type")
+	strApplicationJSON = []byte("application/json")
+)
+
+type RequestHandler struct{}
+
+func (h *RequestHandler) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
+	switch string(ctx.Path()) {
+	case "/":
+		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+		ctx.Response.SetStatusCode(200)
+		obj := map[string]interface{}{
 			"name": "searchgoose",
 			"version": map[string]interface{}{
 				"number": "0.0.0",
 			},
-		})
-	})
-	r.GET("/_nodes", func(context *gin.Context) {
-		context.JSON(200, gin.H{
+		}
+		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
+			log.Println(err)
+		}
+	case "/_nodes":
+		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+		ctx.Response.SetStatusCode(200)
+		obj := map[string]interface{}{
 			"nodes": map[string]interface{}{
 				cluster.GenerateNodeId(): map[string]interface{}{
 					"ip":      "127.0.0.1",
@@ -32,21 +48,28 @@ func misc(r *gin.Engine) {
 					},
 				},
 			},
-		})
-	})
-	r.GET("/_xpack", func(context *gin.Context) {
-		context.JSON(200, gin.H{
+		}
+		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
+			log.Println(err)
+		}
+	case "/_xpack":
+		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+		ctx.Response.SetStatusCode(200)
+		obj := map[string]interface{}{
 			"license": map[string]interface{}{
 				"uid":    "d0309419-2f93-4b56-95e1-97c0c6415956",
 				"type":   "basic",
 				"mode":   "basic",
 				"status": "active",
 			},
-		})
-	})
-
-	r.NoRoute(func(context *gin.Context) {
-		context.JSON(404, gin.H{
+		}
+		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
+			log.Println(err)
+		}
+	default:
+		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+		ctx.Response.SetStatusCode(200)
+		obj := map[string]interface{}{
 			"error": map[string]interface{}{
 				"root_capuse": []map[string]interface{}{
 					{
@@ -66,16 +89,17 @@ func misc(r *gin.Engine) {
 				"index":         ".kibana",
 			},
 			"status": 404,
-		})
-	})
+		}
+		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
+			log.Println(err)
+		}
+	}
 }
 
 func New() *Bootstrap {
 	r := gin.Default()
 	indexMapping := mapping.NewIndexMapping()
 	i, _ := index.NewIndex("./examples", indexMapping)
-
-	misc(r)
 
 	r.GET("/_cat/templates/:template", func(context *gin.Context) {
 		context.JSON(200, []interface{}{})
@@ -126,11 +150,17 @@ func New() *Bootstrap {
 		})
 	})
 
+	h := RequestHandler{}
+
+	s := &fasthttp.Server{
+		Handler: h.HandleFastHTTP,
+	}
+
 	return &Bootstrap{
-		r: r,
+		s: s,
 	}
 }
 
 func (b *Bootstrap) Start() error {
-	return b.r.Run()
+	return b.s.ListenAndServe(":8080")
 }
