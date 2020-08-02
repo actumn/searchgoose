@@ -49,15 +49,35 @@ func TestDifferentNamesOnDifferentPath(t *testing.T) {
 	trie := newPathTrie()
 	trie.insert("/a/{type}", "test1")
 	trie.insert("/b/{name}", "test2")
+
+	// Action, Assert
+	params := map[string]string{}
+	assert.Equal(t, trie.retrieve("/a/test", params, WILDCARD_NODES_ALLOWED), "test1")
+	assert.Equal(t, params["type"], "test")
+
+	params = map[string]string{}
+	assert.Equal(t, trie.retrieve("/b/testX", params, WILDCARD_NODES_ALLOWED), "test2")
+	assert.Equal(t, params["name"], "testX")
 }
 
 func TestSameNameOnDifferentPath(t *testing.T) {
+	// Arrange
 	trie := newPathTrie()
 	trie.insert("/a/c/{name}", "test1")
 	trie.insert("/b/{name}", "test2")
+
+	// Action, Assert
+	params := map[string]string{}
+	assert.Equal(t, trie.retrieve("/a/c/test", params, WILDCARD_NODES_ALLOWED), "test1")
+	assert.Equal(t, params["name"], "test")
+
+	params = map[string]string{}
+	assert.Equal(t, trie.retrieve("/b/testX", params, WILDCARD_NODES_ALLOWED), "test2")
+	assert.Equal(t, params["name"], "testX")
 }
 
 func TestPreferNonWildcardExecution(t *testing.T) {
+	// Arrange
 	trie := newPathTrie()
 	trie.insert("{test}", "test1")
 	trie.insert("b", "test2")
@@ -65,9 +85,17 @@ func TestPreferNonWildcardExecution(t *testing.T) {
 	trie.insert("b/a", "test4")
 	trie.insert("{test}/{testB}", "test5")
 	trie.insert("{test}/x/{testC}", "test6")
+
+	// Action, ASsert
+	params := map[string]string{}
+	assert.Equal(t, trie.retrieve("/b", params, WILDCARD_NODES_ALLOWED), "test2")
+	assert.Equal(t, trie.retrieve("/b/a", params, WILDCARD_NODES_ALLOWED), "test4")
+	assert.Equal(t, trie.retrieve("/v/x", params, WILDCARD_NODES_ALLOWED), "test5")
+	assert.Equal(t, trie.retrieve("/v/x/c", params, WILDCARD_NODES_ALLOWED), "test6")
 }
 
 func TestWildcardMatchingModes(t *testing.T) {
+	// Arrange
 	trie := newPathTrie()
 	trie.insert("{testA}", "test1")
 	trie.insert("{testA}/{testB}", "test2")
@@ -79,9 +107,38 @@ func TestWildcardMatchingModes(t *testing.T) {
 	trie.insert("{testA}/b/{testB}", "test8")
 	trie.insert("x/{testB}/z", "test9")
 	trie.insert("{testA}/{testB}/{testC}", "test10")
+
+	// Action, Assert
+	params := map[string]string{}
+	assert.Equal(t, trie.retrieve("/a", params, WILDCARD_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/a", params, WILDCARD_ROOT_NODES_ALLOWED), "test1")
+	assert.Equal(t, trie.retrieve("/a", params, WILDCARD_LEAF_NODES_ALLOWED), "test1")
+	assert.Equal(t, trie.retrieve("/a", params, WILDCARD_NODES_ALLOWED), "test1")
+	// trie.retrieveAll
+
+	assert.Equal(t, trie.retrieve("/a/b/c", params, WILDCARD_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/a/b/c", params, WILDCARD_ROOT_NODES_ALLOWED), "test5")
+	assert.Equal(t, trie.retrieve("/a/b/c", params, WILDCARD_LEAF_NODES_ALLOWED), "test7")
+	assert.Equal(t, trie.retrieve("/a/b/c", params, WILDCARD_NODES_ALLOWED), "test7")
+	//trie.retrieveAll
+
+	assert.Equal(t, trie.retrieve("/x/y/z", params, WILDCARD_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/x/y/z", params, WILDCARD_ROOT_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/x/y/z", params, WILDCARD_LEAF_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/x/y/z", params, WILDCARD_NODES_ALLOWED), "test9")
+	// trie.retrieveAll
+
+	assert.Equal(t, trie.retrieve("/d/e/f", params, WILDCARD_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/d/e/f", params, WILDCARD_ROOT_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/d/e/f", params, WILDCARD_LEAF_NODES_ALLOWED), nil)
+	assert.Equal(t, trie.retrieve("/d/e/f", params, WILDCARD_NODES_ALLOWED), "test10")
+	//trie.retrieveAll
+
+	// Action, Assert
 }
 
 func TestExplicitMatchingMode(t *testing.T) {
+	// Arrange
 	trie := newPathTrie()
 	trie.insert("{testA}", "test1")
 	trie.insert("a", "test2")
@@ -93,24 +150,82 @@ func TestExplicitMatchingMode(t *testing.T) {
 	trie.insert("x/{testA}/z", "test8")
 	trie.insert("{testA}/{testB}/{testC}", "test9")
 	trie.insert("a/b/c", "test10")
+
+	// Action, Assert
+	params := map[string]string{}
+	assert.Equal(t, trie.retrieve("/a", params, EXPLICIT_NODES_ONLY), "test2")
+	assert.Equal(t, trie.retrieve("/x", params, EXPLICIT_NODES_ONLY), nil)
+	assert.Equal(t, trie.retrieve("/a/b", params, EXPLICIT_NODES_ONLY), "test6")
+	assert.Equal(t, trie.retrieve("/a/x", params, EXPLICIT_NODES_ONLY), nil)
+	assert.Equal(t, trie.retrieve("/a/b/c", params, EXPLICIT_NODES_ONLY), "test10")
+	assert.Equal(t, trie.retrieve("/x/y/z", params, EXPLICIT_NODES_ONLY), nil)
 }
 
 func TestSamePathConcreteResolution(t *testing.T) {
+	// Arrange
 	trie := newPathTrie()
 	trie.insert("{x}/{y}/{z}", "test1")
 	trie.insert("{x}/_y/{k}", "test2")
+
+	// Action, Assert
+	params := map[string]string{}
+	assert.Equal(t, trie.retrieve("/a/b/c", params, WILDCARD_NODES_ALLOWED), "test1")
+	assert.Equal(t, params["x"], "a")
+	assert.Equal(t, params["y"], "b")
+	assert.Equal(t, params["z"], "c")
+
+	params = map[string]string{}
+	assert.Equal(t, trie.retrieve("/a/_y/c", params, WILDCARD_NODES_ALLOWED), "test2")
+	assert.Equal(t, params["x"], "a")
+	assert.Equal(t, params["k"], "c")
 }
 
 func TestNamedWildcardAndLookupWithWildcard(t *testing.T) {
+	// Arrange
 	trie := newPathTrie()
 	trie.insert("x/{test}", "test1")
 	trie.insert("{test}/a", "test2")
 	trie.insert("/{test}", "test3")
 	trie.insert("/{test}/_endpoint", "test4")
 	trie.insert("/*/{test}/_endpoint", "test5")
+
+	// Action, Assert
+	params := map[string]string{}
+	assert.Equal(t, trie.retrieve("/x/*", params, WILDCARD_NODES_ALLOWED), "test1")
+	assert.Equal(t, params["test"], "*")
+
+	params = map[string]string{}
+	assert.Equal(t, trie.retrieve("/b/a", params, WILDCARD_NODES_ALLOWED), "test2")
+	assert.Equal(t, params["test"], "b")
+
+	params = map[string]string{}
+	assert.Equal(t, trie.retrieve("/*", params, WILDCARD_NODES_ALLOWED), "test3")
+	assert.Equal(t, params["test"], "*")
+
+	params = map[string]string{}
+	assert.Equal(t, trie.retrieve("/*/_endpoint", params, WILDCARD_NODES_ALLOWED), "test4")
+	assert.Equal(t, params["test"], "*")
+
+	params = map[string]string{}
+	assert.Equal(t, trie.retrieve("a/*/_endpoint", params, WILDCARD_NODES_ALLOWED), "test5")
+	assert.Equal(t, params["test"], "*")
 }
 
-func TestEscapedSlashWithinUrl(t *testing.T) {
-	trie := newPathTrie()
-	trie.insert("/{index}/{type}/{id}", "test")
-}
+//func TestEscapedSlashWithinUrl(t *testing.T) {
+//	// Arrange
+//	trie := newPathTrie()
+//	trie.insert("/{index}/{type}/{id}", "test")
+//
+//	// Action, Assert
+//	params := map[string]string{}
+//	assert.Equal(t, trie.retrieve("/index/type/a%2Fe", params, WILDCARD_NODES_ALLOWED), "test")
+//	assert.Equal(t, params["index"], "index")
+//	assert.Equal(t, params["type"], "type")
+//	assert.Equal(t, params["id"], "a/e")
+//
+//	params = map[string]string{}
+//	assert.Equal(t, trie.retrieve("/<logstash-{now%2Fd}>/type/id", params, WILDCARD_NODES_ALLOWED), "test")
+//	assert.Equal(t, params["index"], "<logstash-{now/d}>")
+//	assert.Equal(t, params["type"], "type")
+//	assert.Equal(t, params["id"], "id")
+//}

@@ -103,13 +103,13 @@ func (n *trieNode) retrieve(path []string, index int, params map[string]string, 
 				return nil
 			}
 			usedWildcard = true
-		} else if mode == WILDCARD_ROOT_NODES_ALLOWED {
+		} else if mode == WILDCARD_ROOT_NODES_ALLOWED && index == 1 {
 			node, exists = n.children[n.wildcard]
 			if !exists {
 				return nil
 			}
 			usedWildcard = true
-		} else if mode == WILDCARD_LEAF_NODES_ALLOWED {
+		} else if mode == WILDCARD_LEAF_NODES_ALLOWED && index+1 == len(path) {
 			node, exists = n.children[n.wildcard]
 			if !exists {
 				return nil
@@ -165,11 +165,11 @@ func newPathTrie() *pathTrie {
 }
 
 func (t *pathTrie) insert(path string, value interface{}) {
-	strs := strings.Split(path, SEPARATOR)
-	if len(strs) == 0 {
+	if path == "" || path == "/" {
 		t.rootValue = value
 		return
 	}
+	strs := strings.Split(path, SEPARATOR)
 	index := 0
 	if strs[0] == "" {
 		index = 1
@@ -182,15 +182,11 @@ func (t *pathTrie) insertOrUpdate() {
 }
 
 func (t *pathTrie) retrieve(path string, params map[string]string, mode TrieMatchingMode) interface{} {
-	if len(path) == 0 {
+	if path == "" || path == "/" {
 		return t.rootValue
 	}
 	strs := strings.Split(path, SEPARATOR)
-	if len(strs) == 0 {
-		return t.rootValue
-	}
 	index := 0
-
 	if strs[0] == "" {
 		index = 1
 	}
