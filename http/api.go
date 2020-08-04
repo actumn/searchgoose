@@ -2,156 +2,124 @@ package http
 
 import (
 	"encoding/json"
-	"github.com/actumn/searchgoose/cluster"
-	"github.com/actumn/searchgoose/index"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/gin-gonic/gin"
+	"github.com/actumn/searchgoose/http/handlers"
 	"github.com/valyala/fasthttp"
 	"log"
 )
-
-type Bootstrap struct {
-	s *fasthttp.Server
-}
 
 var (
 	strContentType     = []byte("Content-Type")
 	strApplicationJSON = []byte("application/json")
 )
 
-type RequestHandler struct{}
+type RequestController struct {
+	pathTrie *pathTrie
+}
 
-func (h *RequestHandler) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
-	switch string(ctx.Path()) {
-	case "/":
+func (h *RequestController) init() {
+	h.pathTrie = newPathTrie()
+	h.pathTrie.insert("/", &handlers.RestMain{})
+	h.pathTrie.insert("/_nodes", &handlers.RestNodes{})
+	h.pathTrie.insert("/_xpack", &handlers.RestXpack{})
+}
+
+func (h *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
+	path := string(ctx.Path())
+	if path == "/favicon.ico" {
+		return
+	}
+	params := map[string]string{}
+	log.Println(path)
+	handler, ok := h.pathTrie.retrieve(path, params, EXPLICIT_NODES_ONLY).(handlers.RestHandler)
+	if !ok {
 		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-		ctx.Response.SetStatusCode(200)
-		obj := map[string]interface{}{
-			"name": "searchgoose",
-			"version": map[string]interface{}{
-				"number": "0.0.0",
-			},
-		}
-		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
+		ctx.Response.SetStatusCode(400)
+		if err := json.NewEncoder(ctx).Encode(map[string]string{
+			"msg": "no route",
+		}); err != nil {
 			log.Println(err)
 		}
-	case "/_nodes":
+		return
+	}
+	request := handlers.RestRequest{}
+	response, err := handler.Handle(&request)
+	if err == nil {
 		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 		ctx.Response.SetStatusCode(200)
-		obj := map[string]interface{}{
-			"nodes": map[string]interface{}{
-				cluster.GenerateNodeId(): map[string]interface{}{
-					"ip":      "127.0.0.1",
-					"version": "7.8.0",
-					"http": map[string]interface{}{
-						"public_address": "127.0.0.1:8080",
-					},
-				},
-			},
-		}
-		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
+		if err := json.NewEncoder(ctx).Encode(response); err != nil {
 			log.Println(err)
 		}
-	case "/_xpack":
+	} else {
 		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-		ctx.Response.SetStatusCode(200)
-		obj := map[string]interface{}{
-			"license": map[string]interface{}{
-				"uid":    "d0309419-2f93-4b56-95e1-97c0c6415956",
-				"type":   "basic",
-				"mode":   "basic",
-				"status": "active",
-			},
-		}
-		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
-			log.Println(err)
-		}
-	default:
-		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-		ctx.Response.SetStatusCode(200)
-		obj := map[string]interface{}{
-			"error": map[string]interface{}{
-				"root_capuse": []map[string]interface{}{
-					{
-						"type":          "index_not_found_exception",
-						"reason":        "no such index [.kibana]",
-						"resource.type": "index_or_alias",
-						"resource.id":   ".kibana",
-						"index_uuid":    "_na_",
-						"index":         ".kibana",
-					},
-				},
-				"type":          "index_not_found_exception",
-				"reason":        "no such index [.kibana]",
-				"resource.type": "index_or_alias",
-				"resource.id":   ".kibana",
-				"index_uuid":    "_na_",
-				"index":         ".kibana",
-			},
-			"status": 404,
-		}
-		if err := json.NewEncoder(ctx).Encode(obj); err != nil {
+		ctx.Response.SetStatusCode(500)
+		if err := json.NewEncoder(ctx).Encode(map[string]string{
+			"msg": err.Error(),
+		}); err != nil {
 			log.Println(err)
 		}
 	}
 }
 
+type Bootstrap struct {
+	s *fasthttp.Server
+}
+
 func New() *Bootstrap {
-	r := gin.Default()
-	indexMapping := mapping.NewIndexMapping()
-	i, _ := index.NewIndex("./examples", indexMapping)
+	//r := gin.Default()
+	//indexMapping := mapping.NewIndexMapping()
+	//i, _ := index.NewIndex("./examples", indexMapping)
+	//
+	//r.GET("/_cat/templates/:template", func(context *gin.Context) {
+	//	context.JSON(200, []interface{}{})
+	//})
+	//
+	//r.GET("/_doc/:id", func(context *gin.Context) {
+	//	id := context.Param("id")
+	//	doc, err := i.Get(id)
+	//	if err != nil {
+	//		context.JSON(404, gin.H{
+	//			"message": err.Error(),
+	//		})
+	//		return
+	//	}
+	//
+	//	context.JSON(200, doc)
+	//})
+	//
+	//r.PUT("/_doc/:id", func(context *gin.Context) {
+	//	id := context.Param("id")
+	//	var doc map[string]interface{}
+	//	if err := context.Bind(&doc); err != nil {
+	//		context.JSON(500, gin.H{
+	//			"code":    500,
+	//			"message": err.Error(),
+	//		})
+	//		return
+	//	}
+	//	if err := i.Index(id, doc); err != nil {
+	//		context.JSON(500, gin.H{
+	//			"code":    500,
+	//			"message": err.Error(),
+	//		})
+	//		return
+	//	}
+	//})
+	//
+	//r.DELETE("/_doc/:id", func(context *gin.Context) {
+	//	id := context.Param("id")
+	//	err := i.Delete(id)
+	//	if err != nil {
+	//		context.JSON(500, gin.H{
+	//			"message": err.Error(),
+	//		})
+	//	}
+	//	context.JSON(200, gin.H{
+	//		"message": "OK",
+	//	})
+	//})
 
-	r.GET("/_cat/templates/:template", func(context *gin.Context) {
-		context.JSON(200, []interface{}{})
-	})
-
-	r.GET("/_doc/:id", func(context *gin.Context) {
-		id := context.Param("id")
-		doc, err := i.Get(id)
-		if err != nil {
-			context.JSON(404, gin.H{
-				"message": err.Error(),
-			})
-			return
-		}
-
-		context.JSON(200, doc)
-	})
-
-	r.PUT("/_doc/:id", func(context *gin.Context) {
-		id := context.Param("id")
-		var doc map[string]interface{}
-		if err := context.Bind(&doc); err != nil {
-			context.JSON(500, gin.H{
-				"code":    500,
-				"message": err.Error(),
-			})
-			return
-		}
-		if err := i.Index(id, doc); err != nil {
-			context.JSON(500, gin.H{
-				"code":    500,
-				"message": err.Error(),
-			})
-			return
-		}
-	})
-
-	r.DELETE("/_doc/:id", func(context *gin.Context) {
-		id := context.Param("id")
-		err := i.Delete(id)
-		if err != nil {
-			context.JSON(500, gin.H{
-				"message": err.Error(),
-			})
-		}
-		context.JSON(200, gin.H{
-			"message": "OK",
-		})
-	})
-
-	h := RequestHandler{}
-
+	h := RequestController{}
+	h.init()
 	s := &fasthttp.Server{
 		Handler: h.HandleFastHTTP,
 	}
