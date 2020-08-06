@@ -19,6 +19,8 @@ type RequestController struct {
 func (c *RequestController) init() {
 	c.pathTrie = newPathTrie()
 	c.pathTrie.insert("/", &handlers.RestMain{})
+	c.pathTrie.insert("/_cat/templates", &handlers.RestTemplates{})
+	c.pathTrie.insert("/_cat/templates/{name}", &handlers.RestTemplates{})
 	c.pathTrie.insert("/_nodes", &handlers.RestNodes{})
 	c.pathTrie.insert("/_xpack", &handlers.RestXpack{})
 	c.pathTrie.insert("/{index}", &handlers.RestGetIndices{})
@@ -84,13 +86,8 @@ type Bootstrap struct {
 }
 
 func New() *Bootstrap {
-	//r := gin.Default()
 	//indexMapping := mapping.NewIndexMapping()
 	//i, _ := index.NewIndex("./examples", indexMapping)
-	//
-	//r.GET("/_cat/templates/:template", func(context *gin.Context) {
-	//	context.JSON(200, []interface{}{})
-	//})
 	//
 	//r.GET("/_doc/:id", func(context *gin.Context) {
 	//	id := context.Param("id")
