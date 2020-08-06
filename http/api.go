@@ -21,6 +21,8 @@ func (c *RequestController) init() {
 	c.pathTrie.insert("/", &handlers.RestMain{})
 	c.pathTrie.insert("/_nodes", &handlers.RestNodes{})
 	c.pathTrie.insert("/_xpack", &handlers.RestXpack{})
+	c.pathTrie.insert("/{index}", &handlers.RestGetIndices{})
+	//c.pathTrie.insert("/{index}/_doc/{id}", &handlers.RestIndex{})
 }
 
 func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
@@ -29,9 +31,21 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	log.Println(path)
+
+	request := handlers.RestRequest{
+		Path:        path,
+		Method:      ctx.Method(),
+		QueryParams: map[string][]byte{},
+		Body:        ctx.Request.Body(),
+	}
+	ctx.QueryArgs().VisitAll(func(key, value []byte) {
+		request.QueryParams[string(key)] = value
+	})
 	allHandlers := c.pathTrie.retrieveAll(path)
 	for {
-		h, _, err := allHandlers()
+		h, params, err := allHandlers()
+		request.PathParams = params
+
 		if err != nil {
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			ctx.Response.SetStatusCode(400)
@@ -44,7 +58,6 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		}
 		handler, ok := h.(handlers.RestHandler)
 		if ok {
-			request := handlers.RestRequest{}
 			response, err := handler.Handle(&request)
 			if err == nil {
 				ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
