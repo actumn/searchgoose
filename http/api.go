@@ -1,16 +1,150 @@
 package http
 
 import (
-	"github.com/gin-gonic/gin"
+	"encoding/json"
+	"github.com/actumn/searchgoose/http/handlers"
+	"github.com/valyala/fasthttp"
+	"log"
 )
 
-func Api(r *gin.Engine) {
-	v1 := r.Group("v1")
+var (
+	strContentType     = []byte("Content-Type")
+	strApplicationJSON = []byte("application/json")
+)
 
-	v1.GET("/ping", func(context *gin.Context) {
-		context.JSON(200, gin.H{
-			"message": "pong",
-		})
+type RequestController struct {
+	pathTrie *pathTrie
+}
+
+func (c *RequestController) init() {
+	c.pathTrie = newPathTrie()
+	c.pathTrie.insert("/", &handlers.RestMain{})
+	c.pathTrie.insert("/_cat/templates", &handlers.RestTemplates{})
+	c.pathTrie.insert("/_cat/templates/{name}", &handlers.RestTemplates{})
+	c.pathTrie.insert("/_nodes", &handlers.RestNodes{})
+	c.pathTrie.insert("/_xpack", &handlers.RestXpack{})
+	c.pathTrie.insert("/{index}", &handlers.RestGetIndices{})
+	//c.pathTrie.insert("/{index}/_doc/{id}", &handlers.RestIndex{})
+}
+
+func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
+	path := string(ctx.Path())
+	if path == "/favicon.ico" {
+		return
+	}
+	log.Println(path)
+
+	request := handlers.RestRequest{
+		Path:        path,
+		Method:      ctx.Method(),
+		QueryParams: map[string][]byte{},
+		Body:        ctx.Request.Body(),
+	}
+	ctx.QueryArgs().VisitAll(func(key, value []byte) {
+		request.QueryParams[string(key)] = value
 	})
+	allHandlers := c.pathTrie.retrieveAll(path)
+	for {
+		h, params, err := allHandlers()
+		request.PathParams = params
 
+		if err != nil {
+			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+			ctx.Response.SetStatusCode(400)
+			if err := json.NewEncoder(ctx).Encode(map[string]string{
+				"msg": "no route",
+			}); err != nil {
+				log.Println(err)
+			}
+			return
+		}
+		handler, ok := h.(handlers.RestHandler)
+		if ok {
+			response, err := handler.Handle(&request)
+			if err == nil {
+				ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+				ctx.Response.SetStatusCode(200)
+				if err := json.NewEncoder(ctx).Encode(response); err != nil {
+					log.Println(err)
+				}
+			} else {
+				ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+				ctx.Response.SetStatusCode(500)
+				if err := json.NewEncoder(ctx).Encode(map[string]string{
+					"msg": err.Error(),
+				}); err != nil {
+					log.Println(err)
+				}
+			}
+			break
+		}
+	}
+}
+
+type Bootstrap struct {
+	s *fasthttp.Server
+}
+
+func New() *Bootstrap {
+	//indexMapping := mapping.NewIndexMapping()
+	//i, _ := index.NewIndex("./examples", indexMapping)
+	//
+	//r.GET("/_doc/:id", func(context *gin.Context) {
+	//	id := context.Param("id")
+	//	doc, err := i.Get(id)
+	//	if err != nil {
+	//		context.JSON(404, gin.H{
+	//			"message": err.Error(),
+	//		})
+	//		return
+	//	}
+	//
+	//	context.JSON(200, doc)
+	//})
+	//
+	//r.PUT("/_doc/:id", func(context *gin.Context) {
+	//	id := context.Param("id")
+	//	var doc map[string]interface{}
+	//	if err := context.Bind(&doc); err != nil {
+	//		context.JSON(500, gin.H{
+	//			"code":    500,
+	//			"message": err.Error(),
+	//		})
+	//		return
+	//	}
+	//	if err := i.Index(id, doc); err != nil {
+	//		context.JSON(500, gin.H{
+	//			"code":    500,
+	//			"message": err.Error(),
+	//		})
+	//		return
+	//	}
+	//})
+	//
+	//r.DELETE("/_doc/:id", func(context *gin.Context) {
+	//	id := context.Param("id")
+	//	err := i.Delete(id)
+	//	if err != nil {
+	//		context.JSON(500, gin.H{
+	//			"message": err.Error(),
+	//		})
+	//	}
+	//	context.JSON(200, gin.H{
+	//		"message": "OK",
+	//	})
+	//})
+
+	c := RequestController{}
+	c.init()
+	s := &fasthttp.Server{
+		Handler: c.HandleFastHTTP,
+	}
+
+	return &Bootstrap{
+		s: s,
+	}
+}
+
+func (b *Bootstrap) Start() error {
+	return b.s.ListenAndServe(":8080")
 }

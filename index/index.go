@@ -12,14 +12,14 @@ import (
 
 type Index struct {
 	index        bleve.Index
-	indexMapping *mapping.IndexMapping
+	indexMapping mapping.IndexMapping
 }
 
-func NewIndex(dir string, indexMapping *mapping.IndexMapping) (*Index, error) {
+func NewIndex(dir string, indexMapping mapping.IndexMapping) (*Index, error) {
 	var index bleve.Index
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		index, err = bleve.NewUsing(dir, *indexMapping, scorch.Name, scorch.Name, nil)
+		index, err = bleve.NewUsing(dir, indexMapping, scorch.Name, scorch.Name, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -89,4 +89,30 @@ func (i *Index) Get(id string) (map[string]interface{}, error) {
 	}
 
 	return fields, nil
+}
+
+func (i *Index) Search(searchRequest *bleve.SearchRequest) (*bleve.SearchResult, error) {
+	searchResult, err := i.index.Search(searchRequest)
+	if err != nil {
+		return nil, err
+	}
+	return searchResult, nil
+}
+
+func (i *Index) Index(id string, fields map[string]interface{}) error {
+	if err := i.index.Index(id, fields); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *Index) Delete(id string) error {
+	if err := i.index.Delete(id); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *Index) Mapping() mapping.IndexMapping {
+	return i.indexMapping
 }

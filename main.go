@@ -2,14 +2,13 @@ package main
 
 import (
 	"github.com/actumn/searchgoose/http"
-	"github.com/gin-gonic/gin"
+	"log"
 )
 
 func main() {
-	r := gin.Default()
-	http.Api(r)
-	err := r.Run()
-	if err != nil {
+	b := http.New()
+	log.Println("start server...")
+	if err := b.Start(); err != nil {
 		panic(err)
 	}
 }
