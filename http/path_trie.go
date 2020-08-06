@@ -1,6 +1,9 @@
 package http
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 type TrieMatchingMode int
 
@@ -181,9 +184,10 @@ func (t *pathTrie) insertOrUpdate() {
 
 }
 
-func (t *pathTrie) retrieve(path string, params map[string]string, mode TrieMatchingMode) interface{} {
+func (t *pathTrie) retrieve(path string, mode TrieMatchingMode) (interface{}, map[string]string) {
+	params := map[string]string{}
 	if path == "" || path == "/" {
-		return t.rootValue
+		return t.rootValue, params
 	}
 	strs := strings.Split(path, SEPARATOR)
 	index := 0
@@ -191,5 +195,17 @@ func (t *pathTrie) retrieve(path string, params map[string]string, mode TrieMatc
 		index = 1
 	}
 
-	return t.root.retrieve(strs, index, params, mode)
+	return t.root.retrieve(strs, index, params, mode), params
+}
+
+func (t *pathTrie) retrieveAll(path string) func() (interface{}, map[string]string, error) {
+	mode := EXPLICIT_NODES_ONLY
+	return func() (interface{}, map[string]string, error) {
+		if mode > WILDCARD_NODES_ALLOWED {
+			return nil, nil, errors.New("NoRoute")
+		}
+		handler, params := t.retrieve(path, mode)
+		mode += 1
+		return handler, params, nil
+	}
 }

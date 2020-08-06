@@ -16,46 +16,52 @@ type RequestController struct {
 	pathTrie *pathTrie
 }
 
-func (h *RequestController) init() {
-	h.pathTrie = newPathTrie()
-	h.pathTrie.insert("/", &handlers.RestMain{})
-	h.pathTrie.insert("/_nodes", &handlers.RestNodes{})
-	h.pathTrie.insert("/_xpack", &handlers.RestXpack{})
+func (c *RequestController) init() {
+	c.pathTrie = newPathTrie()
+	c.pathTrie.insert("/", &handlers.RestMain{})
+	c.pathTrie.insert("/_nodes", &handlers.RestNodes{})
+	c.pathTrie.insert("/_xpack", &handlers.RestXpack{})
 }
 
-func (h *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
+func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 	path := string(ctx.Path())
 	if path == "/favicon.ico" {
 		return
 	}
-	params := map[string]string{}
 	log.Println(path)
-	handler, ok := h.pathTrie.retrieve(path, params, EXPLICIT_NODES_ONLY).(handlers.RestHandler)
-	if !ok {
-		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-		ctx.Response.SetStatusCode(400)
-		if err := json.NewEncoder(ctx).Encode(map[string]string{
-			"msg": "no route",
-		}); err != nil {
-			log.Println(err)
+	allHandlers := c.pathTrie.retrieveAll(path)
+	for {
+		h, _, err := allHandlers()
+		if err != nil {
+			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+			ctx.Response.SetStatusCode(400)
+			if err := json.NewEncoder(ctx).Encode(map[string]string{
+				"msg": "no route",
+			}); err != nil {
+				log.Println(err)
+			}
+			return
 		}
-		return
-	}
-	request := handlers.RestRequest{}
-	response, err := handler.Handle(&request)
-	if err == nil {
-		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-		ctx.Response.SetStatusCode(200)
-		if err := json.NewEncoder(ctx).Encode(response); err != nil {
-			log.Println(err)
-		}
-	} else {
-		ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-		ctx.Response.SetStatusCode(500)
-		if err := json.NewEncoder(ctx).Encode(map[string]string{
-			"msg": err.Error(),
-		}); err != nil {
-			log.Println(err)
+		handler, ok := h.(handlers.RestHandler)
+		if ok {
+			request := handlers.RestRequest{}
+			response, err := handler.Handle(&request)
+			if err == nil {
+				ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+				ctx.Response.SetStatusCode(200)
+				if err := json.NewEncoder(ctx).Encode(response); err != nil {
+					log.Println(err)
+				}
+			} else {
+				ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+				ctx.Response.SetStatusCode(500)
+				if err := json.NewEncoder(ctx).Encode(map[string]string{
+					"msg": err.Error(),
+				}); err != nil {
+					log.Println(err)
+				}
+			}
+			break
 		}
 	}
 }
@@ -118,10 +124,10 @@ func New() *Bootstrap {
 	//	})
 	//})
 
-	h := RequestController{}
-	h.init()
+	c := RequestController{}
+	c.init()
 	s := &fasthttp.Server{
-		Handler: h.HandleFastHTTP,
+		Handler: c.HandleFastHTTP,
 	}
 
 	return &Bootstrap{
