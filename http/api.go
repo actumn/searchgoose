@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/actumn/searchgoose/http/handlers"
 	"github.com/valyala/fasthttp"
@@ -12,42 +13,65 @@ var (
 	strApplicationJSON = []byte("application/json")
 )
 
+func requestFromCtx(ctx *fasthttp.RequestCtx) handlers.RestRequest {
+	request := handlers.RestRequest{
+		Path:        string(ctx.Path()),
+		QueryParams: map[string][]byte{},
+		Body:        ctx.Request.Body(),
+	}
+	if bytes.Compare(ctx.Method(), []byte("GET")) == 0 {
+		request.Method = handlers.GET
+	} else if bytes.Compare(ctx.Method(), []byte("POST")) == 0 {
+		request.Method = handlers.POST
+	} else if bytes.Compare(ctx.Method(), []byte("PUT")) == 0 {
+		request.Method = handlers.PUT
+	} else if bytes.Compare(ctx.Method(), []byte("DELETE")) == 0 {
+		request.Method = handlers.DELETE
+	}
+	ctx.QueryArgs().VisitAll(func(key, value []byte) {
+		request.QueryParams[string(key)] = value
+	})
+
+	return request
+}
+
 type RequestController struct {
 	pathTrie *pathTrie
 }
 
 func (c *RequestController) init() {
 	c.pathTrie = newPathTrie()
-	c.pathTrie.insert("/", &handlers.RestMain{})
-	c.pathTrie.insert("/_cat/templates", &handlers.RestTemplates{})
-	c.pathTrie.insert("/_cat/templates/{name}", &handlers.RestTemplates{})
-	c.pathTrie.insert("/_nodes", &handlers.RestNodes{})
-	c.pathTrie.insert("/_xpack", &handlers.RestXpack{})
-	c.pathTrie.insert("/{index}", &handlers.RestGetIndices{})
+	c.pathTrie.insert("/", handlers.MethodHandlers{
+		handlers.GET: &handlers.RestMain{},
+	})
+	c.pathTrie.insert("/_cat/templates", handlers.MethodHandlers{
+		handlers.GET: &handlers.RestTemplates{},
+	})
+	c.pathTrie.insert("/_cat/templates/{name}", handlers.MethodHandlers{
+		handlers.GET: &handlers.RestTemplates{},
+	})
+	c.pathTrie.insert("/_nodes", handlers.MethodHandlers{
+		handlers.GET: &handlers.RestNodes{},
+	})
+	c.pathTrie.insert("/_xpack", handlers.MethodHandlers{
+		handlers.GET: &handlers.RestXpack{},
+	})
+	c.pathTrie.insert("/{index}", handlers.MethodHandlers{
+		handlers.GET: &handlers.RestGetIndices{},
+	})
 	//c.pathTrie.insert("/{index}/_doc/{id}", &handlers.RestIndex{})
 }
 
 func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
-	path := string(ctx.Path())
-	if path == "/favicon.ico" {
+	request := requestFromCtx(ctx)
+	if request.Path == "/favicon.ico" {
 		return
 	}
-	log.Println(path)
-
-	request := handlers.RestRequest{
-		Path:        path,
-		Method:      ctx.Method(),
-		QueryParams: map[string][]byte{},
-		Body:        ctx.Request.Body(),
-	}
-	ctx.QueryArgs().VisitAll(func(key, value []byte) {
-		request.QueryParams[string(key)] = value
-	})
-	allHandlers := c.pathTrie.retrieveAll(path)
+	log.Println(request.Path)
+	allHandlers := c.pathTrie.retrieveAll(request.Path)
 	for {
 		h, params, err := allHandlers()
 		request.PathParams = params
-
 		if err != nil {
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			ctx.Response.SetStatusCode(400)
@@ -58,26 +82,33 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 			}
 			return
 		}
-		handler, ok := h.(handlers.RestHandler)
-		if ok {
-			response, err := handler.Handle(&request)
-			if err == nil {
-				ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-				ctx.Response.SetStatusCode(200)
-				if err := json.NewEncoder(ctx).Encode(response); err != nil {
-					log.Println(err)
-				}
-			} else {
-				ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-				ctx.Response.SetStatusCode(500)
-				if err := json.NewEncoder(ctx).Encode(map[string]string{
-					"msg": err.Error(),
-				}); err != nil {
-					log.Println(err)
-				}
-			}
-			break
+		methodHandlers, ok := h.(handlers.MethodHandlers)
+		if !ok {
+			continue
 		}
+
+		handler, ok := methodHandlers[request.Method]
+		if !ok {
+			continue
+		}
+
+		response, err := handler.Handle(&request)
+		if err == nil {
+			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+			ctx.Response.SetStatusCode(200)
+			if err := json.NewEncoder(ctx).Encode(response); err != nil {
+				log.Println(err)
+			}
+		} else {
+			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+			ctx.Response.SetStatusCode(500)
+			if err := json.NewEncoder(ctx).Encode(map[string]string{
+				"msg": err.Error(),
+			}); err != nil {
+				log.Println(err)
+			}
+		}
+		return
 	}
 }
 
