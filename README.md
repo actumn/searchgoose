@@ -4,8 +4,8 @@
   <br/>
   <br/>
   <p>
-    Simple, distributed, lighweight<br>
-    search engine implementation written in go
+    Elasticsearch-like simple, distributed, lighweight<br>
+    RESTful search engine implementation written in go
   </p>
   <p>
     <a href="https://github.com/actumn/searchgoose/blob/master/LICENSE">
