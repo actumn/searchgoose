@@ -1,4 +1,4 @@
-package services
+package cluster
 
 import (
 	"encoding/base64"

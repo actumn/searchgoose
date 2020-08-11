@@ -3,7 +3,7 @@ package http
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/actumn/searchgoose/http/handlers"
+	"github.com/actumn/searchgoose/http/actions"
 	"github.com/valyala/fasthttp"
 	"log"
 )
@@ -13,20 +13,20 @@ var (
 	strApplicationJSON = []byte("application/json")
 )
 
-func requestFromCtx(ctx *fasthttp.RequestCtx) handlers.RestRequest {
-	request := handlers.RestRequest{
+func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
+	request := actions.RestRequest{
 		Path:        string(ctx.Path()),
 		QueryParams: map[string][]byte{},
 		Body:        ctx.Request.Body(),
 	}
 	if bytes.Compare(ctx.Method(), []byte("GET")) == 0 {
-		request.Method = handlers.GET
+		request.Method = actions.GET
 	} else if bytes.Compare(ctx.Method(), []byte("POST")) == 0 {
-		request.Method = handlers.POST
+		request.Method = actions.POST
 	} else if bytes.Compare(ctx.Method(), []byte("PUT")) == 0 {
-		request.Method = handlers.PUT
+		request.Method = actions.PUT
 	} else if bytes.Compare(ctx.Method(), []byte("DELETE")) == 0 {
-		request.Method = handlers.DELETE
+		request.Method = actions.DELETE
 	}
 	ctx.QueryArgs().VisitAll(func(key, value []byte) {
 		request.QueryParams[string(key)] = value
@@ -41,25 +41,25 @@ type RequestController struct {
 
 func (c *RequestController) init() {
 	c.pathTrie = newPathTrie()
-	c.pathTrie.insert("/", handlers.MethodHandlers{
-		handlers.GET: &handlers.RestMain{},
+	c.pathTrie.insert("/", actions.MethodHandlers{
+		actions.GET: &actions.RestMain{},
 	})
-	c.pathTrie.insert("/_cat/templates", handlers.MethodHandlers{
-		handlers.GET: &handlers.RestTemplates{},
+	c.pathTrie.insert("/_cat/templates", actions.MethodHandlers{
+		actions.GET: &actions.RestTemplates{},
 	})
-	c.pathTrie.insert("/_cat/templates/{name}", handlers.MethodHandlers{
-		handlers.GET: &handlers.RestTemplates{},
+	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
+		actions.GET: &actions.RestTemplates{},
 	})
-	c.pathTrie.insert("/_nodes", handlers.MethodHandlers{
-		handlers.GET: &handlers.RestNodes{},
+	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
+		actions.GET: &actions.RestNodes{},
 	})
-	c.pathTrie.insert("/_xpack", handlers.MethodHandlers{
-		handlers.GET: &handlers.RestXpack{},
+	c.pathTrie.insert("/_xpack", actions.MethodHandlers{
+		actions.GET: &actions.RestXpack{},
 	})
-	c.pathTrie.insert("/{index}", handlers.MethodHandlers{
-		handlers.GET: &handlers.RestGetIndices{},
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.GET: &actions.RestGetIndices{},
 	})
-	//c.pathTrie.insert("/{index}/_doc/{id}", &handlers.RestIndex{})
+	//c.pathTrie.insert("/{index}/_doc/{id}", &actions.RestIndex{})
 }
 
 func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
@@ -82,7 +82,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 			}
 			return
 		}
-		methodHandlers, ok := h.(handlers.MethodHandlers)
+		methodHandlers, ok := h.(actions.MethodHandlers)
 		if !ok {
 			continue
 		}

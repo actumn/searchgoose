@@ -15,7 +15,7 @@ type GatewayMetaState struct {
 	PersistedState persist.PersistedState
 }
 
-func (m *GatewayMetaState) start(
+func (m *GatewayMetaState) Start(
 	transportService transport.Service,
 	clusterService cluster.Service,
 	persistedClusterStateService persist.ClusterStateService) {
@@ -24,9 +24,10 @@ func (m *GatewayMetaState) start(
 	clusterState := ClusterState{
 		Name: "searchgoose-testCluster",
 		Nodes: discovery.Nodes{
-			Nodes: map[string]discovery.Node{
+			Nodes: map[string]*discovery.Node{
 				transportService.LocalNode.Id: transportService.LocalNode,
 			},
+			LocalNodeId: transportService.LocalNode.Id,
 		},
 		Version:  onDiskState.LastAcceptedVersion,
 		Metadata: onDiskState.Metadata,

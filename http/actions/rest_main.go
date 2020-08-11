@@ -1,4 +1,4 @@
-package handlers
+package actions
 
 type RestMain struct{}
 

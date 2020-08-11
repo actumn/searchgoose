@@ -1,13 +1,15 @@
-package handlers
+package actions
 
-import "github.com/actumn/searchgoose/services"
+import (
+	"github.com/actumn/searchgoose/services/cluster"
+)
 
 type RestNodes struct{}
 
 func (h *RestNodes) Handle(r *RestRequest) (interface{}, error) {
 	return map[string]interface{}{
 		"nodes": map[string]interface{}{
-			services.GenerateNodeId(): map[string]interface{}{
+			cluster.GenerateNodeId(): map[string]interface{}{
 				"ip":      "127.0.0.1",
 				"version": "7.8.0",
 				"http": map[string]interface{}{

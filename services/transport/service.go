@@ -3,8 +3,8 @@ package transport
 import "github.com/actumn/searchgoose/services/discovery"
 
 type Service struct {
-	LocalNode discovery.Node
+	LocalNode *discovery.Node
 }
 
-type Address struct {
+type Transport interface {
 }

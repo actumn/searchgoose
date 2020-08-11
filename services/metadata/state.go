@@ -13,6 +13,3 @@ type ClusterState struct {
 
 type Blocks struct {
 }
-
-type CoordinationState struct {
-}

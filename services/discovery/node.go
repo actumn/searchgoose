@@ -1,19 +1,24 @@
 package discovery
 
+import "github.com/actumn/searchgoose/services/transport"
+
 type Node struct {
 	Name        string
 	Id          string
 	ephemeralId string
 	HostName    string
 	HostAddress string
-	//Address TransportAddress
+	Address     transport.Address
 	Attributess map[string]string
 	//version Version
 	//roles map[DiscoveryNodeRole]struct{}
 }
 
-func CreateLocal(name string, id string) {
-
+func CreateLocal(id string) *Node {
+	return &Node{
+		Name: "testName",
+		Id:   id,
+	}
 }
 
 func isMasterNode() bool {
@@ -25,9 +30,9 @@ func isDataNode() bool {
 }
 
 type Nodes struct {
-	Nodes        map[string]Node
-	DataNodes    map[string]Node
-	MasterNodes  map[string]Node
+	Nodes        map[string]*Node
+	DataNodes    map[string]*Node
+	MasterNodes  map[string]*Node
 	MasterNodeId string
 	LocalNodeId  string
 }
