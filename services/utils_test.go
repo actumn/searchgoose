@@ -1,4 +1,4 @@
-package cluster
+package services
 
 import (
 	"fmt"
