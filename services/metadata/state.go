@@ -8,7 +8,7 @@ type ClusterState struct {
 	Name      string
 	Metadata  Metadata
 	Blocks    Blocks
-	Nodes     discovery.Nodes
+	Nodes     *discovery.Nodes
 }
 
 type Blocks struct {

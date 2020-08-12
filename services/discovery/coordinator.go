@@ -6,13 +6,28 @@ import (
 	"github.com/actumn/searchgoose/services/transport"
 )
 
+type Mode int
+
+const (
+	INIT Mode = iota
+	CANDIDATE
+	LEADER
+	FOLLOWER
+)
+
 type Coordinator struct {
 	transportService transport.Service
-	PeerFinder       PeerFinder
+	PeerFinder       CoordinatorPeerFinder
 	persistedState   persist.PersistedState
 
 	CoordinationState CoordinationState
 	ApplierState      metadata.ClusterState
+
+	mode Mode
+}
+
+func newCoordinator() {
+
 }
 
 func (c *Coordinator) Start() {
@@ -23,7 +38,7 @@ func (c *Coordinator) Start() {
 
 	c.ApplierState = metadata.ClusterState{
 		Name: "searchgoose-testClusters",
-		Nodes: Nodes{
+		Nodes: &Nodes{
 			Nodes: map[string]*Node{
 				c.transportService.LocalNode.Id: c.transportService.LocalNode,
 			},
@@ -33,15 +48,31 @@ func (c *Coordinator) Start() {
 }
 
 func (c *Coordinator) StartInitialJoin() {
+	c.becomeCandidate("startInital")
+}
+
+func (c *Coordinator) becomeCandidate(method string) {
+	if c.mode != CANDIDATE {
+		c.mode = CANDIDATE
+		c.PeerFinder.activate(c.CoordinationState.PersistedState.GetLastAcceptedState().Nodes)
+	}
+}
+
+type CoordinatorPeerFinder struct {
+	LastAcceptedNodes *Nodes
+	active            bool
+}
+
+func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *Nodes) {
+	f.LastAcceptedNodes = lastAcceptedNodes
+	f.active = true
+	f.handleWakeUp()
+}
+
+func (f *CoordinatorPeerFinder) handleWakeUp() {
 
 }
 
-func (c *Coordinator) becomeCandidate() {
+func (f *CoordinatorPeerFinder) onFoundPeersUpdated() {
 
-}
-
-type PeerFinder interface {
-}
-
-type JoinHelper interface {
 }

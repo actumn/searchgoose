@@ -1,6 +1,8 @@
 package persist
 
-import "github.com/actumn/searchgoose/services/metadata"
+import (
+	"github.com/actumn/searchgoose/services/metadata"
+)
 
 var (
 	NoOnDiskState = OnDiskState{
@@ -21,4 +23,5 @@ func (s *OnDiskState) empty() bool {
 }
 
 type PersistedState interface {
+	GetLastAcceptedState() *metadata.ClusterState
 }

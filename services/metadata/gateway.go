@@ -21,9 +21,9 @@ func (m *GatewayMetaState) Start(
 	persistedClusterStateService persist.ClusterStateService) {
 	onDiskState := persistedClusterStateService.LoadBestOnDiskState()
 
-	clusterState := ClusterState{
+	clusterState := &ClusterState{
 		Name: "searchgoose-testCluster",
-		Nodes: discovery.Nodes{
+		Nodes: &discovery.Nodes{
 			Nodes: map[string]*discovery.Node{
 				transportService.LocalNode.Id: transportService.LocalNode,
 			},
@@ -33,7 +33,7 @@ func (m *GatewayMetaState) Start(
 		Metadata: onDiskState.Metadata,
 	}
 
-	m.PersistedState = BlevePersistedState{
+	m.PersistedState = &BlevePersistedState{
 		PersistedClusterStateService: persistedClusterStateService,
 		CurrentTerm:                  onDiskState.CurrentTerm,
 		LastAcceptedState:            clusterState,
@@ -43,5 +43,9 @@ func (m *GatewayMetaState) Start(
 type BlevePersistedState struct {
 	PersistedClusterStateService persist.ClusterStateService
 	CurrentTerm                  int64
-	LastAcceptedState            ClusterState
+	LastAcceptedState            *ClusterState
+}
+
+func (s *BlevePersistedState) GetLastAcceptedState() *ClusterState {
+	return s.LastAcceptedState
 }
