@@ -92,22 +92,13 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 
-		response, err := handler.Handle(&request)
-		if err == nil {
+		handler.Handle(&request, func(response actions.RestResponse) {
+			ctx.Response.SetStatusCode(response.StatusCode)
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-			ctx.Response.SetStatusCode(200)
-			if err := json.NewEncoder(ctx).Encode(response); err != nil {
+			if err := json.NewEncoder(ctx).Encode(response.Body); err != nil {
 				log.Println(err)
 			}
-		} else {
-			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-			ctx.Response.SetStatusCode(500)
-			if err := json.NewEncoder(ctx).Encode(map[string]string{
-				"msg": err.Error(),
-			}); err != nil {
-				log.Println(err)
-			}
-		}
+		})
 		return
 	}
 }

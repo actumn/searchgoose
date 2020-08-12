@@ -19,6 +19,13 @@ type RestRequest struct {
 	Body        []byte
 }
 
+type RestResponse struct {
+	StatusCode int
+	Body       interface{}
+}
+
+type ResponseListener func(response RestResponse)
+
 type RestHandler interface {
-	Handle(r *RestRequest) (interface{}, error)
+	Handle(r *RestRequest, reply ResponseListener)
 }

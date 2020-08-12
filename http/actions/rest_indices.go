@@ -2,30 +2,33 @@ package actions
 
 type RestGetIndices struct{}
 
-func (h *RestGetIndices) Handle(r *RestRequest) (interface{}, error) {
+func (h *RestGetIndices) Handle(r *RestRequest, reply ResponseListener) {
 	indexName := r.PathParams["index"]
 
-	return map[string]interface{}{
-		"error": map[string]interface{}{
-			"root_cause": []map[string]interface{}{
-				{
-					"type":          "index_not_found_exception",
-					"reason":        "no such index [" + indexName + "]",
-					"resource.type": "index_or_alias",
-					"resource.id":   ".kibana",
-					"index_uuid":    "_na_",
-					"index":         ".kibana",
+	reply(RestResponse{
+		StatusCode: 200,
+		Body: map[string]interface{}{
+			"error": map[string]interface{}{
+				"root_cause": []map[string]interface{}{
+					{
+						"type":          "index_not_found_exception",
+						"reason":        "no such index [" + indexName + "]",
+						"resource.type": "index_or_alias",
+						"resource.id":   ".kibana",
+						"index_uuid":    "_na_",
+						"index":         ".kibana",
+					},
 				},
+				"type":          "index_not_found_exception",
+				"reason":        "no such index [" + indexName + "]",
+				"resource.type": "index_or_alias",
+				"resource.id":   indexName,
+				"index_uuid":    "_na_",
+				"index":         indexName,
 			},
-			"type":          "index_not_found_exception",
-			"reason":        "no such index [" + indexName + "]",
-			"resource.type": "index_or_alias",
-			"resource.id":   indexName,
-			"index_uuid":    "_na_",
-			"index":         indexName,
+			"status": 404,
 		},
-		"status": 404,
-	}, nil
+	})
 }
 
 type RestPostIndices struct{}
