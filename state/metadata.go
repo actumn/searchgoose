@@ -1,4 +1,4 @@
-package services
+package state
 
 type Metadata struct {
 	ClusterUUID  string

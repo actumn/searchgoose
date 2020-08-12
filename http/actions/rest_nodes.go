@@ -1,10 +1,12 @@
 package actions
 
 import (
-	"github.com/actumn/searchgoose/services/cluster"
+	"github.com/actumn/searchgoose/state/cluster"
 )
 
-type RestNodes struct{}
+type RestNodes struct {
+	ClusterService *cluster.Service
+}
 
 func (h *RestNodes) Handle(r *RestRequest, reply ResponseListener) {
 	reply(RestResponse{

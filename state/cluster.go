@@ -1,4 +1,4 @@
-package services
+package state
 
 type ClusterState struct {
 	Version   int64

@@ -1,4 +1,4 @@
-package services
+package state
 
 var (
 	NoOnDiskState = OnDiskState{

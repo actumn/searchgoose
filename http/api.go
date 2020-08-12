@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/actumn/searchgoose/http/actions"
+	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/valyala/fasthttp"
 	"log"
 )
@@ -37,29 +38,6 @@ func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 
 type RequestController struct {
 	pathTrie *pathTrie
-}
-
-func (c *RequestController) init() {
-	c.pathTrie = newPathTrie()
-	c.pathTrie.insert("/", actions.MethodHandlers{
-		actions.GET: &actions.RestMain{},
-	})
-	c.pathTrie.insert("/_cat/templates", actions.MethodHandlers{
-		actions.GET: &actions.RestTemplates{},
-	})
-	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
-		actions.GET: &actions.RestTemplates{},
-	})
-	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
-		actions.GET: &actions.RestNodes{},
-	})
-	c.pathTrie.insert("/_xpack", actions.MethodHandlers{
-		actions.GET: &actions.RestXpack{},
-	})
-	c.pathTrie.insert("/{index}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetIndices{},
-	})
-	//c.pathTrie.insert("/{index}/_doc/{id}", &actions.RestIndex{})
 }
 
 func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
@@ -107,7 +85,7 @@ type Bootstrap struct {
 	s *fasthttp.Server
 }
 
-func New() *Bootstrap {
+func New(clusterService *cluster.Service) *Bootstrap {
 	//indexMapping := mapping.NewIndexMapping()
 	//i, _ := index.NewIndex("./examples", indexMapping)
 	//
@@ -157,7 +135,28 @@ func New() *Bootstrap {
 	//})
 
 	c := RequestController{}
-	c.init()
+	c.pathTrie = newPathTrie()
+	c.pathTrie.insert("/", actions.MethodHandlers{
+		actions.GET: &actions.RestMain{},
+	})
+	c.pathTrie.insert("/_cat/templates", actions.MethodHandlers{
+		actions.GET: &actions.RestTemplates{},
+	})
+	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
+		actions.GET: &actions.RestTemplates{},
+	})
+	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
+		actions.GET: &actions.RestNodes{
+			ClusterService: clusterService,
+		},
+	})
+	c.pathTrie.insert("/_xpack", actions.MethodHandlers{
+		actions.GET: &actions.RestXpack{},
+	})
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.GET: &actions.RestGetIndices{},
+	})
+	//c.pathTrie.insert("/{index}/_doc/{id}", &actions.RestIndex{})
 	s := &fasthttp.Server{
 		Handler: c.HandleFastHTTP,
 	}

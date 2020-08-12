@@ -1,4 +1,4 @@
-package services
+package state
 
 type Node struct {
 	Name        string
@@ -12,7 +12,7 @@ type Node struct {
 	//roles map[DiscoveryNodeRole]struct{}
 }
 
-func CreateLocal(id string) *Node {
+func CreateLocalNode(id string) *Node {
 	return &Node{
 		Name: "testName",
 		Id:   id,

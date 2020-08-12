@@ -1,18 +1,18 @@
 package discovery
 
-import "github.com/actumn/searchgoose/services"
+import "github.com/actumn/searchgoose/state"
 
 type JoinHelper struct {
 }
 
 type JoinAccumulator interface {
-	handleJoinRequest(sender services.Node)
+	handleJoinRequest(sender state.Node)
 }
 
 type InitialJoinAccumulator struct {
 }
 
-func (a *InitialJoinAccumulator) handleJoinRequest(sender services.Node) {
+func (a *InitialJoinAccumulator) handleJoinRequest(sender state.Node) {
 
 }
 
