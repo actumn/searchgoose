@@ -1,8 +1,7 @@
 package discovery
 
 import (
-	"github.com/actumn/searchgoose/services/metadata"
-	"github.com/actumn/searchgoose/services/persist"
+	"github.com/actumn/searchgoose/services"
 	"github.com/actumn/searchgoose/services/transport"
 )
 
@@ -18,10 +17,10 @@ const (
 type Coordinator struct {
 	transportService transport.Service
 	PeerFinder       CoordinatorPeerFinder
-	persistedState   persist.PersistedState
+	PersistedState   services.PersistedState
 
-	CoordinationState CoordinationState
-	ApplierState      metadata.ClusterState
+	CoordinationState services.CoordinationState
+	ApplierState      services.ClusterState
 
 	mode Mode
 }
@@ -31,15 +30,15 @@ func newCoordinator() {
 }
 
 func (c *Coordinator) Start() {
-	c.CoordinationState = CoordinationState{
+	c.CoordinationState = services.CoordinationState{
 		LocalNode:      c.transportService.LocalNode,
-		PersistedState: c.persistedState,
+		PersistedState: c.PersistedState,
 	}
 
-	c.ApplierState = metadata.ClusterState{
+	c.ApplierState = services.ClusterState{
 		Name: "searchgoose-testClusters",
-		Nodes: &Nodes{
-			Nodes: map[string]*Node{
+		Nodes: &services.Nodes{
+			Nodes: map[string]*services.Node{
 				c.transportService.LocalNode.Id: c.transportService.LocalNode,
 			},
 			LocalNodeId: c.transportService.LocalNode.Id,
@@ -59,11 +58,11 @@ func (c *Coordinator) becomeCandidate(method string) {
 }
 
 type CoordinatorPeerFinder struct {
-	LastAcceptedNodes *Nodes
+	LastAcceptedNodes *services.Nodes
 	active            bool
 }
 
-func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *Nodes) {
+func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *services.Nodes) {
 	f.LastAcceptedNodes = lastAcceptedNodes
 	f.active = true
 	f.handleWakeUp()

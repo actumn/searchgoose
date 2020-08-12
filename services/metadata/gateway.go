@@ -1,8 +1,8 @@
 package metadata
 
 import (
+	"github.com/actumn/searchgoose/services"
 	"github.com/actumn/searchgoose/services/cluster"
-	"github.com/actumn/searchgoose/services/discovery"
 	"github.com/actumn/searchgoose/services/persist"
 	"github.com/actumn/searchgoose/services/transport"
 )
@@ -12,7 +12,7 @@ func prepareInitialClusterState() {
 }
 
 type GatewayMetaState struct {
-	PersistedState persist.PersistedState
+	PersistedState services.PersistedState
 }
 
 func (m *GatewayMetaState) Start(
@@ -21,10 +21,10 @@ func (m *GatewayMetaState) Start(
 	persistedClusterStateService persist.ClusterStateService) {
 	onDiskState := persistedClusterStateService.LoadBestOnDiskState()
 
-	clusterState := &ClusterState{
+	clusterState := &services.ClusterState{
 		Name: "searchgoose-testCluster",
-		Nodes: &discovery.Nodes{
-			Nodes: map[string]*discovery.Node{
+		Nodes: &services.Nodes{
+			Nodes: map[string]*services.Node{
 				transportService.LocalNode.Id: transportService.LocalNode,
 			},
 			LocalNodeId: transportService.LocalNode.Id,
@@ -43,9 +43,9 @@ func (m *GatewayMetaState) Start(
 type BlevePersistedState struct {
 	PersistedClusterStateService persist.ClusterStateService
 	CurrentTerm                  int64
-	LastAcceptedState            *ClusterState
+	LastAcceptedState            *services.ClusterState
 }
 
-func (s *BlevePersistedState) GetLastAcceptedState() *ClusterState {
+func (s *BlevePersistedState) GetLastAcceptedState() *services.ClusterState {
 	return s.LastAcceptedState
 }

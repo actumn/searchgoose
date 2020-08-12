@@ -1,9 +1,11 @@
 package transport
 
-import "github.com/actumn/searchgoose/services/discovery"
+import (
+	"github.com/actumn/searchgoose/services"
+)
 
 type Service struct {
-	LocalNode *discovery.Node
+	LocalNode *services.Node
 }
 
 type Transport interface {

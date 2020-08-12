@@ -1,6 +1,4 @@
-package metadata
-
-import "github.com/actumn/searchgoose/services/discovery"
+package services
 
 type ClusterState struct {
 	Version   int64
@@ -8,8 +6,13 @@ type ClusterState struct {
 	Name      string
 	Metadata  Metadata
 	Blocks    Blocks
-	Nodes     *discovery.Nodes
+	Nodes     *Nodes
 }
 
 type Blocks struct {
+}
+
+type CoordinationState struct {
+	LocalNode      *Node
+	PersistedState PersistedState
 }

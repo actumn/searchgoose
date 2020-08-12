@@ -1,12 +1,8 @@
-package persist
-
-import (
-	"github.com/actumn/searchgoose/services/metadata"
-)
+package services
 
 var (
 	NoOnDiskState = OnDiskState{
-		Metadata: metadata.EmptyMetadata,
+		Metadata: EmptyMetadata,
 	}
 )
 
@@ -15,7 +11,7 @@ type OnDiskState struct {
 	DataPath            string
 	CurrentTerm         int64
 	LastAcceptedVersion int64
-	Metadata            metadata.Metadata
+	Metadata            Metadata
 }
 
 func (s *OnDiskState) empty() bool {
@@ -23,5 +19,5 @@ func (s *OnDiskState) empty() bool {
 }
 
 type PersistedState interface {
-	GetLastAcceptedState() *metadata.ClusterState
+	GetLastAcceptedState() *ClusterState
 }

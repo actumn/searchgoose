@@ -1,6 +1,4 @@
-package discovery
-
-import "github.com/actumn/searchgoose/services/transport"
+package services
 
 type Node struct {
 	Name        string
@@ -8,7 +6,7 @@ type Node struct {
 	ephemeralId string
 	HostName    string
 	HostAddress string
-	Address     transport.Address
+	Address     Address
 	Attributess map[string]string
 	//version Version
 	//roles map[DiscoveryNodeRole]struct{}
