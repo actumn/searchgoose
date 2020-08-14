@@ -4,7 +4,7 @@
   <br/>
   <br/>
   <p>
-    Elasticsearch-like simple, distributed, lighweight<br>
+    Simple, distributed, lighweight<br>
     RESTful search engine implementation written in go
   </p>
   <p>
@@ -19,3 +19,5 @@
 
 Study purposes, mostly for understanding the implementation details of how
 search engines are made, performance trade-offs and structure.
+
+Based on elasticsearch 7.8.x
