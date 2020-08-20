@@ -28,6 +28,8 @@ func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 		request.Method = actions.PUT
 	} else if bytes.Compare(ctx.Method(), []byte("DELETE")) == 0 {
 		request.Method = actions.DELETE
+	} else if bytes.Compare(ctx.Method(), []byte("HEAD")) == 0 {
+		request.Method = actions.HEAD
 	}
 	ctx.QueryArgs().VisitAll(func(key, value []byte) {
 		request.QueryParams[string(key)] = value
@@ -154,9 +156,36 @@ func New(clusterService *cluster.Service) *Bootstrap {
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/{index}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetIndices{},
+		actions.PUT: &actions.RestPutIndex{},
 	})
-	//c.pathTrie.insert("/{index}/_doc/{id}", &actions.RestIndex{})
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.GET: &actions.RestGetIndex{},
+	})
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.DELETE: &actions.RestDeleteIndex{},
+	})
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.HEAD: &actions.RestHeadIndex{},
+	})
+	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
+		actions.POST: &actions.RestIndexDoc{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.PUT: &actions.RestIndexDocId{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.GET: &actions.RestGetDoc{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.HEAD: &actions.RestHeadDoc{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.DELETE: &actions.RestDeleteDoc{},
+	})
+	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
+		actions.GET: &actions.RestIndexSearch{},
+	})
+
 	s := &fasthttp.Server{
 		Handler: c.HandleFastHTTP,
 	}

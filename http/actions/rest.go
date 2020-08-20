@@ -7,6 +7,7 @@ const (
 	POST
 	PUT
 	DELETE
+	HEAD
 )
 
 type MethodHandlers map[RestMethod]RestHandler
