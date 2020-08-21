@@ -31,6 +31,9 @@ func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 	} else if bytes.Compare(ctx.Method(), []byte("HEAD")) == 0 {
 		request.Method = actions.HEAD
 	}
+	ctx.Request.Header.VisitAll(func(key, value []byte) {
+		request.Header[string(key)] = value
+	})
 	ctx.QueryArgs().VisitAll(func(key, value []byte) {
 		request.QueryParams[string(key)] = value
 	})

@@ -34,3 +34,6 @@ type Nodes struct {
 	MasterNodeId string
 	LocalNodeId  string
 }
+
+type RoutingTable struct {
+}

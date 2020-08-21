@@ -1,12 +1,17 @@
 package state
 
+type ClusterService interface {
+	State() *ClusterState
+}
+
 type ClusterState struct {
 	Version   int64
-	stateUUID string
+	StateUUID string
 	Name      string
-	Metadata  Metadata
-	Blocks    Blocks
 	Nodes     *Nodes
+	Metadata  Metadata
+	//Blocks    Blocks
+	//RoutingTable RoutingTable
 }
 
 type Blocks struct {
