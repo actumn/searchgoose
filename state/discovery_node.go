@@ -6,8 +6,8 @@ type Node struct {
 	ephemeralId string
 	HostName    string
 	HostAddress string
-	Address     Address
-	Attributess map[string]string
+	//Address     Address
+	Attributes map[string]string
 	//version Version
 	//roles map[DiscoveryNodeRole]struct{}
 }

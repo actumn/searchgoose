@@ -16,7 +16,9 @@ type MetadataCreateIndexService struct {
 }
 
 func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpdateRequest) {
-	//s.ClusterService.SubmitStateUpdate()
+	s.ClusterService.SubmitStateUpdateTask(func(current state.ClusterState) state.ClusterState {
+		return s.applyCreateIndex(current, req)
+	})
 }
 
 func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState, req CreateIndexClusterStateUpdateRequest) state.ClusterState {

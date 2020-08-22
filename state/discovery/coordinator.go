@@ -16,19 +16,21 @@ const (
 )
 
 type Coordinator struct {
-	TransportService transport.Service
+	TransportService *transport.Service
 	PeerFinder       CoordinatorPeerFinder
 	PersistedState   state.PersistedState
 
 	CoordinationState     state.CoordinationState
-	ApplierState          state.ClusterState
-	ClusterApplierService cluster.ApplierService
+	ApplierState          *state.ClusterState
+	ClusterApplierService *cluster.ApplierService
+	MasterService         *cluster.MasterService
 
 	mode Mode
 }
 
-func newCoordinator() {
-
+func NewCoordinator() {
+	c := Coordinator{}
+	c.TransportService.RegisterRequestHandler("publish_state", c.handlePublish)
 }
 
 func (c *Coordinator) Start() {
@@ -37,7 +39,7 @@ func (c *Coordinator) Start() {
 		PersistedState: c.PersistedState,
 	}
 
-	c.ApplierState = state.ClusterState{
+	c.ApplierState = &state.ClusterState{
 		Name: "searchgoose-testClusters",
 		Nodes: &state.Nodes{
 			Nodes: map[string]*state.Node{
@@ -47,6 +49,7 @@ func (c *Coordinator) Start() {
 		},
 	}
 	c.ClusterApplierService.ClusterState = c.ApplierState
+	c.MasterService.ClusterState = c.ApplierState
 }
 
 func (c *Coordinator) StartInitialJoin() {
@@ -58,6 +61,24 @@ func (c *Coordinator) becomeCandidate(method string) {
 		c.mode = CANDIDATE
 		c.PeerFinder.activate(c.CoordinationState.PersistedState.GetLastAcceptedState().Nodes)
 	}
+}
+
+func (c *Coordinator) publish(event state.ClusterChangedEvent) {
+	if c.mode != LEADER {
+		return
+	}
+
+	newState := event.State
+	nodes := newState.Nodes
+
+	for _, node := range nodes.Nodes {
+		c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes())
+	}
+}
+
+func (c *Coordinator) handlePublish(req []byte) {
+	clusterState := state.ClusterStateFromBytes(req)
+
 }
 
 type CoordinatorPeerFinder struct {
