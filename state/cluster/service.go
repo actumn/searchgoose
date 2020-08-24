@@ -20,12 +20,23 @@ type ApplierService struct {
 	ClusterState *state.ClusterState
 }
 
+func (s *ApplierService) OnNewState(clusterState *state.ClusterState) {
+	// TODO:: goroutine 으로 구현하면 좋을 것 같다.
+	changedEvent := state.ClusterChangedEvent{
+		State:     *clusterState,
+		PrevState: *s.ClusterState,
+	}
+
+	s.ClusterState = clusterState
+}
+
 type MasterService struct {
 	ClusterState *state.ClusterState
+	// Publisher func
 }
 
 func (s *MasterService) submitStateUpdateTask(task state.ClusterStateUpdateTask) {
-	// goroutine 으로 구현하면 좋을 것 같다.
+	// TODO:: goroutine 으로 구현하면 좋을 것 같다.
 	newState := task(*s.ClusterState)
 
 	clusterChangedEvent := state.ClusterChangedEvent{

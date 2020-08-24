@@ -20,4 +20,5 @@ func (s *OnDiskState) empty() bool {
 
 type PersistedState interface {
 	GetLastAcceptedState() *ClusterState
+	SetLastAcceptedState(state *ClusterState)
 }

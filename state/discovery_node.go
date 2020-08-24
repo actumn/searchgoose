@@ -35,5 +35,9 @@ type Nodes struct {
 	LocalNodeId  string
 }
 
+func (n *Nodes) MasterNode() *Node {
+	return n.Nodes[n.MasterNodeId]
+}
+
 type RoutingTable struct {
 }

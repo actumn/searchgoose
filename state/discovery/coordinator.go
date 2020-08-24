@@ -77,8 +77,16 @@ func (c *Coordinator) publish(event state.ClusterChangedEvent) {
 }
 
 func (c *Coordinator) handlePublish(req []byte) {
-	clusterState := state.ClusterStateFromBytes(req)
+	// handle publish
+	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.LocalNode)
+	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()
 
+	c.CoordinationState.PersistedState.SetLastAcceptedState(acceptedState)
+
+	// handle commit
+	c.ApplierState = acceptedState
+	c.MasterService.ClusterState = acceptedState
+	c.ClusterApplierService.OnNewState(acceptedState)
 }
 
 type CoordinatorPeerFinder struct {

@@ -36,13 +36,16 @@ func (c *ClusterState) ToBytes() []byte {
 	}
 	return buffer.Bytes()
 }
-func ClusterStateFromBytes(b []byte) *ClusterState {
+func ClusterStateFromBytes(b []byte, localNode *Node) *ClusterState {
 	buffer := bytes.NewBuffer(b)
 	decoder := gob.NewDecoder(buffer)
 	var state ClusterState
 	if err := decoder.Decode(&state); err != nil {
 		log.Fatalln(err)
 	}
+
+	state.Nodes.LocalNodeId = localNode.Id
+	state.Nodes.Nodes[localNode.Id] = localNode
 	return &state
 }
 
