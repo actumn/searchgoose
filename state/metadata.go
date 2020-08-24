@@ -34,6 +34,10 @@ type IndexMetadata struct {
 	//Settings Settings
 }
 
+/*
+	type: "_doc"
+	source: "properties: {}"
+*/
 type MappingMetadata struct {
 	Type   string
 	Source []byte

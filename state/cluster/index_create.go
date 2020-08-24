@@ -1,4 +1,4 @@
-package indices
+package cluster
 
 import (
 	"github.com/actumn/searchgoose/common"

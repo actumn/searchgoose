@@ -91,54 +91,6 @@ type Bootstrap struct {
 }
 
 func New(clusterService *cluster.Service) *Bootstrap {
-	//indexMapping := mapping.NewIndexMapping()
-	//i, _ := index.NewIndex("./examples", indexMapping)
-	//
-	//r.GET("/_doc/:id", func(context *gin.Context) {
-	//	id := context.Param("id")
-	//	doc, err := i.Get(id)
-	//	if err != nil {
-	//		context.JSON(404, gin.H{
-	//			"message": err.Error(),
-	//		})
-	//		return
-	//	}
-	//
-	//	context.JSON(200, doc)
-	//})
-	//
-	//r.PUT("/_doc/:id", func(context *gin.Context) {
-	//	id := context.Param("id")
-	//	var doc map[string]interface{}
-	//	if err := context.Bind(&doc); err != nil {
-	//		context.JSON(500, gin.H{
-	//			"code":    500,
-	//			"message": err.Error(),
-	//		})
-	//		return
-	//	}
-	//	if err := i.Index(id, doc); err != nil {
-	//		context.JSON(500, gin.H{
-	//			"code":    500,
-	//			"message": err.Error(),
-	//		})
-	//		return
-	//	}
-	//})
-	//
-	//r.DELETE("/_doc/:id", func(context *gin.Context) {
-	//	id := context.Param("id")
-	//	err := i.Delete(id)
-	//	if err != nil {
-	//		context.JSON(500, gin.H{
-	//			"message": err.Error(),
-	//		})
-	//	}
-	//	context.JSON(200, gin.H{
-	//		"message": "OK",
-	//	})
-	//})
-
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
 	c.pathTrie.insert("/", actions.MethodHandlers{
