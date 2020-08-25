@@ -8,9 +8,9 @@ import (
 
 func TestIndex_Get(t *testing.T) {
 	indexMapping := mapping.NewIndexMapping()
-	i, _ := NewIndex("./examples", indexMapping)
+	s := NewShard("/examples", indexMapping)
 	id := "test"
-	if doc, err := i.Get(id); err != nil {
+	if doc, err := s.Get(id); err != nil {
 		log.Fatalln(err)
 	} else {
 		log.Println(doc)
@@ -19,19 +19,19 @@ func TestIndex_Get(t *testing.T) {
 
 func TestIndex_Index(t *testing.T) {
 	indexMapping := mapping.NewIndexMapping()
-	i, _ := NewIndex("./examples", indexMapping)
+	s := NewShard("/examples", indexMapping)
 	id := "test"
 	doc := map[string]interface{}{}
-	if err := i.Index(id, doc); err != nil {
+	if err := s.Index(id, doc); err != nil {
 		log.Fatalln(err)
 	}
 }
 
 func TestIndex_Delete(t *testing.T) {
 	indexMapping := mapping.NewIndexMapping()
-	i, _ := NewIndex("./examples", indexMapping)
+	s := NewShard("/examples", indexMapping)
 	id := "test"
-	if err := i.Delete(id); err != nil {
+	if err := s.Delete(id); err != nil {
 		log.Fatalln(err)
 	}
 }

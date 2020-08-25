@@ -15,9 +15,10 @@ func (s *ClusterStateService) ApplyClusterState(event state.ClusterChangedEvent)
 
 	log.Println(clusterState)
 
-	for name, indexMetadata := range clusterState.Metadata.Indices {
-		indexService := s.IndicesService.CreateIndexService()
-		indexService.UpdateMapping()
+	for _, indexMetadata := range clusterState.Metadata.Indices {
+		indexService := s.IndicesService.CreateIndexService(indexMetadata.Index.Uuid)
+		indexService.UpdateMapping(indexMetadata)
+		indexService.CreateShard()
 	}
 }
 
@@ -25,8 +26,9 @@ type Service struct {
 	indices map[string]*index.Service
 }
 
-func (s *Service) CreateIndexService() *index.Service {
-	//s.indices[uuid] = &index.Service{
-	//
-	//}
+func (s *Service) CreateIndexService(uuid string) *index.Service {
+	indexService := index.NewService(uuid)
+	s.indices[uuid] = indexService
+	return indexService
+
 }
