@@ -8,8 +8,8 @@ import (
 func TestRestPutIndices_Handle(t *testing.T) {
 	restPut := RestPutIndices{}
 	req := &RestRequest{
-		QueryParams: map[string][]byte{
-			"index": []byte("test"),
+		PathParams: map[string]string{
+			"index": "test",
 		},
 		Body: []byte(`
 		{
