@@ -7,6 +7,7 @@ const (
 	POST
 	PUT
 	DELETE
+	HEAD
 )
 
 type MethodHandlers map[RestMethod]RestHandler
@@ -16,6 +17,7 @@ type RestRequest struct {
 	Method      RestMethod
 	PathParams  map[string]string
 	QueryParams map[string][]byte
+	Header      map[string][]byte
 	Body        []byte
 }
 

@@ -49,3 +49,7 @@ type BlevePersistedState struct {
 func (s *BlevePersistedState) GetLastAcceptedState() *state.ClusterState {
 	return s.LastAcceptedState
 }
+
+func (s *BlevePersistedState) SetLastAcceptedState(state *state.ClusterState) {
+	s.LastAcceptedState = state
+}

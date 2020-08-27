@@ -6,8 +6,8 @@ type Node struct {
 	ephemeralId string
 	HostName    string
 	HostAddress string
-	Address     Address
-	Attributess map[string]string
+	//Address     Address
+	Attributes map[string]string
 	//version Version
 	//roles map[DiscoveryNodeRole]struct{}
 }
@@ -33,4 +33,11 @@ type Nodes struct {
 	MasterNodes  map[string]*Node
 	MasterNodeId string
 	LocalNodeId  string
+}
+
+func (n *Nodes) MasterNode() *Node {
+	return n.Nodes[n.MasterNodeId]
+}
+
+type RoutingTable struct {
 }

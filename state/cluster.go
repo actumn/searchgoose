@@ -1,18 +1,13 @@
 package state
 
-type ClusterState struct {
-	Version   int64
-	stateUUID string
-	Name      string
-	Metadata  Metadata
-	Blocks    Blocks
-	Nodes     *Nodes
+type ClusterService interface {
+	State() *ClusterState
+	SubmitStateUpdateTask(task ClusterStateUpdateTask)
 }
 
-type Blocks struct {
-}
+type ClusterStateUpdateTask func(s ClusterState) ClusterState
 
-type CoordinationState struct {
-	LocalNode      *Node
-	PersistedState PersistedState
+type ClusterChangedEvent struct {
+	State     ClusterState
+	PrevState ClusterState
 }

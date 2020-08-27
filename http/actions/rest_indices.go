@@ -1,5 +1,10 @@
 package actions
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 type RestGetIndices struct{}
 
 func (h *RestGetIndices) Handle(r *RestRequest, reply ResponseListener) {
@@ -31,10 +36,29 @@ func (h *RestGetIndices) Handle(r *RestRequest, reply ResponseListener) {
 	})
 }
 
-type RestPostIndices struct{}
+type RestPutIndices struct{}
 
-//func (h *RestPostIndices) Handle(r *RestRequest) (interface{}, error) {
-//	return map[string]interface{}{
-//
-//	}, nil
-//}
+func (h *RestPutIndices) Handle(r *RestRequest, reply ResponseListener) {
+	index := r.PathParams["index"]
+
+	var body map[string]interface{}
+	err := json.Unmarshal(r.Body, &body)
+	if err != nil {
+		reply(RestResponse{
+			StatusCode: 400,
+			Body: map[string]interface{}{
+				"err": err,
+			},
+		})
+	}
+	fmt.Print(body)
+
+	reply(RestResponse{
+		StatusCode: 200,
+		Body: map[string]interface{}{
+			"acknowledged":        true,
+			"shards_acknowledged": true,
+			"index":               index,
+		},
+	})
+}

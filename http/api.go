@@ -28,7 +28,12 @@ func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 		request.Method = actions.PUT
 	} else if bytes.Compare(ctx.Method(), []byte("DELETE")) == 0 {
 		request.Method = actions.DELETE
+	} else if bytes.Compare(ctx.Method(), []byte("HEAD")) == 0 {
+		request.Method = actions.HEAD
 	}
+	ctx.Request.Header.VisitAll(func(key, value []byte) {
+		request.Header[string(key)] = value
+	})
 	ctx.QueryArgs().VisitAll(func(key, value []byte) {
 		request.QueryParams[string(key)] = value
 	})
@@ -86,54 +91,6 @@ type Bootstrap struct {
 }
 
 func New(clusterService *cluster.Service) *Bootstrap {
-	//indexMapping := mapping.NewIndexMapping()
-	//i, _ := index.NewIndex("./examples", indexMapping)
-	//
-	//r.GET("/_doc/:id", func(context *gin.Context) {
-	//	id := context.Param("id")
-	//	doc, err := i.Get(id)
-	//	if err != nil {
-	//		context.JSON(404, gin.H{
-	//			"message": err.Error(),
-	//		})
-	//		return
-	//	}
-	//
-	//	context.JSON(200, doc)
-	//})
-	//
-	//r.PUT("/_doc/:id", func(context *gin.Context) {
-	//	id := context.Param("id")
-	//	var doc map[string]interface{}
-	//	if err := context.Bind(&doc); err != nil {
-	//		context.JSON(500, gin.H{
-	//			"code":    500,
-	//			"message": err.Error(),
-	//		})
-	//		return
-	//	}
-	//	if err := i.Index(id, doc); err != nil {
-	//		context.JSON(500, gin.H{
-	//			"code":    500,
-	//			"message": err.Error(),
-	//		})
-	//		return
-	//	}
-	//})
-	//
-	//r.DELETE("/_doc/:id", func(context *gin.Context) {
-	//	id := context.Param("id")
-	//	err := i.Delete(id)
-	//	if err != nil {
-	//		context.JSON(500, gin.H{
-	//			"message": err.Error(),
-	//		})
-	//	}
-	//	context.JSON(200, gin.H{
-	//		"message": "OK",
-	//	})
-	//})
-
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
 	c.pathTrie.insert("/", actions.MethodHandlers{
@@ -154,9 +111,36 @@ func New(clusterService *cluster.Service) *Bootstrap {
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/{index}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetIndices{},
+		actions.PUT: &actions.RestPutIndex{},
 	})
-	//c.pathTrie.insert("/{index}/_doc/{id}", &actions.RestIndex{})
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.GET: &actions.RestGetIndex{},
+	})
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.DELETE: &actions.RestDeleteIndex{},
+	})
+	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.HEAD: &actions.RestHeadIndex{},
+	})
+	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
+		actions.POST: &actions.RestIndexDoc{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.PUT: &actions.RestIndexDocId{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.GET: &actions.RestGetDoc{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.HEAD: &actions.RestHeadDoc{},
+	})
+	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.DELETE: &actions.RestDeleteDoc{},
+	})
+	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
+		actions.GET: &actions.RestIndexSearch{},
+	})
+
 	s := &fasthttp.Server{
 		Handler: c.HandleFastHTTP,
 	}
