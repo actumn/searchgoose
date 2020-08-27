@@ -8,13 +8,12 @@ type Service struct {
 	MasterService  *MasterService
 }
 
-func NewService() *Service{
+func NewService() *Service {
 	return &Service{
-		ApplierService: ,
-		MasterService: ,
+		ApplierService: newApplierService(),
+		MasterService:  newMasterService(),
 	}
 }
-
 
 func (s *Service) State() *state.ClusterState {
 	return s.ApplierService.ClusterState
@@ -28,21 +27,29 @@ type ApplierService struct {
 	ClusterState *state.ClusterState
 }
 
+func newApplierService() *ApplierService {
+	return &ApplierService{}
+}
+
 func (s *ApplierService) OnNewState(clusterState *state.ClusterState) {
 	// TODO:: goroutine 으로 구현하면 좋을 것 같다. (s.start() 해서)
-	changedEvent := state.ClusterChangedEvent{
-		State:     *clusterState,
-		PrevState: *s.ClusterState,
-	}
+	//changedEvent := state.ClusterChangedEvent{
+	//	State:     *clusterState,
+	//	PrevState: *s.ClusterState,
+	//}
 
 	s.ClusterState = clusterState
-
 
 }
 
 type MasterService struct {
-	ClusterState *state.ClusterState
+	ClusterState        *state.ClusterState
+	ClusterStatePublish func(event state.ClusterChangedEvent)
 	// Publisher func
+}
+
+func newMasterService() *MasterService {
+	return &MasterService{}
 }
 
 func (s *MasterService) submitStateUpdateTask(task state.ClusterStateUpdateTask) {
@@ -55,5 +62,5 @@ func (s *MasterService) submitStateUpdateTask(task state.ClusterStateUpdateTask)
 	}
 
 	// publish ... 어떻게하지?
-
+	s.ClusterStatePublish(clusterChangedEvent)
 }

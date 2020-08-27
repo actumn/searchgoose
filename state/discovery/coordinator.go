@@ -28,9 +28,15 @@ type Coordinator struct {
 	mode Mode
 }
 
-func NewCoordinator() {
-	c := Coordinator{}
-	c.TransportService.RegisterRequestHandler("publish_state", c.handlePublish)
+func NewCoordinator(transportService *transport.Service, clusterApplierService *cluster.ApplierService, masterService *cluster.MasterService) *Coordinator {
+	c := &Coordinator{
+		TransportService:      transportService,
+		ClusterApplierService: clusterApplierService,
+		MasterService:         masterService,
+	}
+	c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
+
+	return c
 }
 
 func (c *Coordinator) Start() {
@@ -63,7 +69,7 @@ func (c *Coordinator) becomeCandidate(method string) {
 	}
 }
 
-func (c *Coordinator) publish(event state.ClusterChangedEvent) {
+func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	if c.mode != LEADER {
 		return
 	}
@@ -76,7 +82,7 @@ func (c *Coordinator) publish(event state.ClusterChangedEvent) {
 	}
 }
 
-func (c *Coordinator) handlePublish(req []byte) {
+func (c *Coordinator) HandlePublish(req []byte) {
 	// handle publish
 	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.LocalNode)
 	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()

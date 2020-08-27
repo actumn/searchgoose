@@ -9,8 +9,11 @@ type Service struct {
 	requestHandlers map[string]RequestHandler
 }
 
-func NewService() *Service {
-	return &Service{}
+func NewService(id string) *Service {
+	return &Service{
+		LocalNode:       state.CreateLocalNode(id),
+		requestHandlers: map[string]RequestHandler{},
+	}
 }
 
 func (s *Service) SendRequest(node state.Node, action string, req []byte) {

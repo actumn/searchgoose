@@ -15,10 +15,14 @@ type GatewayMetaState struct {
 	PersistedState state.PersistedState
 }
 
+func NewGatewayMetaState() *GatewayMetaState {
+	return &GatewayMetaState{}
+}
+
 func (m *GatewayMetaState) Start(
-	transportService transport.Service,
-	clusterService cluster.Service,
-	persistedClusterStateService persist.ClusterStateService) {
+	transportService *transport.Service,
+	clusterService *cluster.Service,
+	persistedClusterStateService *persist.ClusterStateService) {
 	onDiskState := persistedClusterStateService.LoadBestOnDiskState()
 
 	clusterState := &state.ClusterState{
@@ -41,7 +45,7 @@ func (m *GatewayMetaState) Start(
 }
 
 type BlevePersistedState struct {
-	PersistedClusterStateService persist.ClusterStateService
+	PersistedClusterStateService *persist.ClusterStateService
 	CurrentTerm                  int64
 	LastAcceptedState            *state.ClusterState
 }
