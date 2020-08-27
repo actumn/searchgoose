@@ -3,10 +3,18 @@ package cluster
 import "github.com/actumn/searchgoose/state"
 
 type Service struct {
-	Settings       Settings
-	ApplierService ApplierService
-	MasterService  MasterService
+	//Settings       Settings
+	ApplierService *ApplierService
+	MasterService  *MasterService
 }
+
+func NewService() *Service{
+	return &Service{
+		ApplierService: ,
+		MasterService: ,
+	}
+}
+
 
 func (s *Service) State() *state.ClusterState {
 	return s.ApplierService.ClusterState
@@ -28,6 +36,8 @@ func (s *ApplierService) OnNewState(clusterState *state.ClusterState) {
 	}
 
 	s.ClusterState = clusterState
+
+
 }
 
 type MasterService struct {

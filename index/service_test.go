@@ -7,7 +7,7 @@ import (
 
 func TestService_UpdateMapping(t *testing.T) {
 	// Arrange
-	indexService := NewService()
+	indexService := NewService("test")
 	indexMetadata := state.IndexMetadata{
 		Mapping: map[string]state.MappingMetadata{
 			"_doc": {

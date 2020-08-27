@@ -10,6 +10,12 @@ type ClusterStateService struct {
 	IndicesService *Service
 }
 
+func NewClusterStateService(indices *Service) *ClusterStateService {
+	return &ClusterStateService{
+		IndicesService: indices,
+	}
+}
+
 func (s *ClusterStateService) ApplyClusterState(event state.ClusterChangedEvent) {
 	clusterState := event.State
 
@@ -24,6 +30,12 @@ func (s *ClusterStateService) ApplyClusterState(event state.ClusterChangedEvent)
 
 type Service struct {
 	indices map[string]*index.Service
+}
+
+func NewService() *Service {
+	return &Service{
+		indices: map[string]*index.Service{},
+	}
 }
 
 func (s *Service) CreateIndexService(uuid string) *index.Service {
