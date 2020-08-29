@@ -1,5 +1,10 @@
 package actions
 
+import (
+	"encoding/json"
+	"github.com/actumn/searchgoose/state/cluster"
+)
+
 type RestGetIndex struct{}
 
 func (h *RestGetIndex) Handle(r *RestRequest, reply ResponseListener) {
@@ -26,19 +31,72 @@ func (h *RestGetIndex) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		},
 	})
+
+	//reply(RestResponse{
+	//	StatusCode: 200,
+	//	Body: map[string]interface{}{
+	//		"error": map[string]interface{}{
+	//			"root_cause": []map[string]interface{}{
+	//				{
+	//					"type":          "index_not_found_exception",
+	//					"reason":        "no such index [" + indexName + "]",
+	//					"resource.type": "index_or_alias",
+	//					"resource.id":   ".kibana",
+	//					"index_uuid":    "_na_",
+	//					"index":         ".kibana",
+	//				},
+	//			},
+	//			"type":          "index_not_found_exception",
+	//			"reason":        "no such index [" + indexName + "]",
+	//			"resource.type": "index_or_alias",
+	//			"resource.id":   indexName,
+	//			"index_uuid":    "_na_",
+	//			"index":         indexName,
+	//		},
+	//		"status": 404,
+	//	},
+	//})
 }
 
-type RestPutIndex struct{}
+type RestPutIndex struct {
+	CreateIndexService *cluster.MetadataCreateIndexService
+}
 
 func (h *RestPutIndex) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	index := r.PathParams["index"]
+
+	var body map[string]interface{}
+	err := json.Unmarshal(r.Body, &body)
+	if err != nil {
+		reply(RestResponse{
+			StatusCode: 400,
+			Body: map[string]interface{}{
+				"err": err,
+			},
+		})
+	}
+
+	mapping, err := json.Marshal(body["mappings"])
+	if err != nil {
+		reply(RestResponse{
+			StatusCode: 400,
+			Body: map[string]interface{}{
+				"err": err,
+			},
+		})
+	}
+
+	h.CreateIndexService.CreateIndex(struct {
+		Index    string
+		Mappings []byte
+	}{Index: index, Mappings: mapping})
 
 	reply(RestResponse{
 		StatusCode: 200,
 		Body: map[string]interface{}{
 			"acknowledged":        true,
 			"shards_acknowledged": true,
-			"index":               indexName,
+			"index":               index,
 		},
 	})
 }

@@ -17,6 +17,7 @@ var (
 func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 	request := actions.RestRequest{
 		Path:        string(ctx.Path()),
+		Header:      map[string][]byte{},
 		QueryParams: map[string][]byte{},
 		Body:        ctx.Request.Body(),
 	}
@@ -90,7 +91,7 @@ type Bootstrap struct {
 	s *fasthttp.Server
 }
 
-func New(clusterService *cluster.Service) *Bootstrap {
+func New(clusterService *cluster.Service, clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService) *Bootstrap {
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
 	c.pathTrie.insert("/", actions.MethodHandlers{
@@ -111,30 +112,20 @@ func New(clusterService *cluster.Service) *Bootstrap {
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/{index}", actions.MethodHandlers{
-		actions.PUT: &actions.RestPutIndex{},
-	})
-	c.pathTrie.insert("/{index}", actions.MethodHandlers{
 		actions.GET: &actions.RestGetIndex{},
-	})
-	c.pathTrie.insert("/{index}", actions.MethodHandlers{
+		actions.PUT: &actions.RestPutIndex{
+			CreateIndexService: clusterMetadataCreateIndexService,
+		},
 		actions.DELETE: &actions.RestDeleteIndex{},
-	})
-	c.pathTrie.insert("/{index}", actions.MethodHandlers{
-		actions.HEAD: &actions.RestHeadIndex{},
+		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
 		actions.POST: &actions.RestIndexDoc{},
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.PUT: &actions.RestIndexDocId{},
-	})
-	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetDoc{},
-	})
-	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.HEAD: &actions.RestHeadDoc{},
-	})
-	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
+		actions.GET:    &actions.RestGetDoc{},
+		actions.PUT:    &actions.RestIndexDocId{},
+		actions.HEAD:   &actions.RestHeadDoc{},
 		actions.DELETE: &actions.RestDeleteDoc{},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{

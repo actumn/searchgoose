@@ -28,11 +28,12 @@ type Coordinator struct {
 	mode Mode
 }
 
-func NewCoordinator(transportService *transport.Service, clusterApplierService *cluster.ApplierService, masterService *cluster.MasterService) *Coordinator {
+func NewCoordinator(transportService *transport.Service, clusterApplierService *cluster.ApplierService, masterService *cluster.MasterService, persistedState state.PersistedState) *Coordinator {
 	c := &Coordinator{
 		TransportService:      transportService,
 		ClusterApplierService: clusterApplierService,
 		MasterService:         masterService,
+		PersistedState:        persistedState,
 	}
 	c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
 
@@ -45,15 +46,16 @@ func (c *Coordinator) Start() {
 		PersistedState: c.PersistedState,
 	}
 
-	c.ApplierState = &state.ClusterState{
-		Name: "searchgoose-testClusters",
-		Nodes: &state.Nodes{
-			Nodes: map[string]*state.Node{
-				c.TransportService.LocalNode.Id: c.TransportService.LocalNode,
-			},
-			LocalNodeId: c.TransportService.LocalNode.Id,
-		},
-	}
+	c.ApplierState = c.PersistedState.GetLastAcceptedState()
+	//c.ApplierState = &state.ClusterState{
+	//	Name: "searchgoose-testClusters",
+	//	Nodes: &state.Nodes{
+	//		Nodes: map[string]*state.Node{
+	//			c.TransportService.LocalNode.Id: c.TransportService.LocalNode,
+	//		},
+	//		LocalNodeId: c.TransportService.LocalNode.Id,
+	//	},
+	//}
 	c.ClusterApplierService.ClusterState = c.ApplierState
 	c.MasterService.ClusterState = c.ApplierState
 }
@@ -70,6 +72,7 @@ func (c *Coordinator) becomeCandidate(method string) {
 }
 
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
+	c.mode = LEADER
 	if c.mode != LEADER {
 		return
 	}

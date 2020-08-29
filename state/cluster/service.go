@@ -24,19 +24,28 @@ func (s *Service) SubmitStateUpdateTask(task state.ClusterStateUpdateTask) {
 }
 
 type ApplierService struct {
-	ClusterState *state.ClusterState
+	ClusterState         *state.ClusterState
+	ClusterStateAppliers []func(event state.ClusterChangedEvent)
 }
 
 func newApplierService() *ApplierService {
 	return &ApplierService{}
 }
 
+func (s *ApplierService) AddApplier(applier func(event state.ClusterChangedEvent)) {
+	s.ClusterStateAppliers = append(s.ClusterStateAppliers, applier)
+}
+
 func (s *ApplierService) OnNewState(clusterState *state.ClusterState) {
 	// TODO:: goroutine 으로 구현하면 좋을 것 같다. (s.start() 해서)
-	//changedEvent := state.ClusterChangedEvent{
-	//	State:     *clusterState,
-	//	PrevState: *s.ClusterState,
-	//}
+	changedEvent := state.ClusterChangedEvent{
+		State:     *clusterState,
+		PrevState: *s.ClusterState,
+	}
+
+	for _, applier := range s.ClusterStateAppliers {
+		applier(changedEvent)
+	}
 
 	s.ClusterState = clusterState
 

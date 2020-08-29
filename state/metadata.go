@@ -47,7 +47,9 @@ type CoordinationState struct {
 }
 
 var (
-	EmptyMetadata = Metadata{}
+	EmptyMetadata = Metadata{
+		Indices: map[string]IndexMetadata{},
+	}
 )
 
 // Metadata

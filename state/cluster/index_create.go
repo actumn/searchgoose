@@ -7,12 +7,18 @@ import (
 
 type CreateIndexClusterStateUpdateRequest struct {
 	Index    string
-	Mappings string
+	Mappings []byte
 	//Settings Settings
 }
 
 type MetadataCreateIndexService struct {
 	ClusterService state.ClusterService
+}
+
+func NewMetadataCreateIndexService(clusterService state.ClusterService) *MetadataCreateIndexService {
+	return &MetadataCreateIndexService{
+		ClusterService: clusterService,
+	}
 }
 
 func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpdateRequest) {
@@ -33,7 +39,7 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 		Mapping: map[string]state.MappingMetadata{
 			"_doc": {
 				Type:   "_doc",
-				Source: []byte(req.Mappings),
+				Source: req.Mappings,
 			},
 		},
 	}

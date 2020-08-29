@@ -3,7 +3,6 @@ package indices
 import (
 	"github.com/actumn/searchgoose/index"
 	"github.com/actumn/searchgoose/state"
-	"log"
 )
 
 type ClusterStateService struct {
@@ -19,12 +18,12 @@ func NewClusterStateService(indices *Service) *ClusterStateService {
 func (s *ClusterStateService) ApplyClusterState(event state.ClusterChangedEvent) {
 	clusterState := event.State
 
-	log.Println(clusterState)
-
 	for _, indexMetadata := range clusterState.Metadata.Indices {
-		indexService := s.IndicesService.CreateIndexService(indexMetadata.Index.Uuid)
-		indexService.UpdateMapping(indexMetadata)
-		indexService.CreateShard()
+		if _, exists := s.IndicesService.IndexService(indexMetadata.Index.Uuid); !exists {
+			indexService := s.IndicesService.CreateIndexService(indexMetadata.Index.Uuid)
+			indexService.UpdateMapping(indexMetadata)
+			indexService.CreateShard()
+		}
 	}
 }
 
@@ -42,5 +41,9 @@ func (s *Service) CreateIndexService(uuid string) *index.Service {
 	indexService := index.NewService(uuid)
 	s.indices[uuid] = indexService
 	return indexService
+}
 
+func (s *Service) IndexService(uuid string) (*index.Service, bool) {
+	v, ok := s.indices[uuid]
+	return v, ok
 }
