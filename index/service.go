@@ -32,6 +32,7 @@ func (s *Service) UpdateMapping(metadata state.IndexMetadata) {
 		log.Fatalln(err)
 	}
 
+	// TODO :: implements more mapping types (numeric, geo, datetime, boolean, sub-document, ...)
 	properties := indexMapping["properties"].(map[string]interface{})
 	for field, fieldProps := range properties {
 		props := fieldProps.(map[string]interface{})
@@ -45,4 +46,9 @@ func (s *Service) CreateShard() {
 	shardId := 0
 	shard := NewShard("./data/"+s.uuid+"/"+strconv.Itoa(shardId), s.indexMapping)
 	s.shards[shardId] = shard
+}
+
+func (s *Service) Shard(shardId int) (*Shard, bool) {
+	shard, ok := s.shards[shardId]
+	return shard, ok
 }

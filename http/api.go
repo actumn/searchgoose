@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/actumn/searchgoose/http/actions"
 	"github.com/actumn/searchgoose/state/cluster"
+	"github.com/actumn/searchgoose/state/indices"
 	"github.com/valyala/fasthttp"
 	"log"
 )
@@ -51,7 +52,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 	if request.Path == "/favicon.ico" {
 		return
 	}
-	log.Println(request.Path)
+	log.Println(string(ctx.Method()) + " " + request.Path)
 	allHandlers := c.pathTrie.retrieveAll(request.Path)
 	for {
 		h, params, err := allHandlers()
@@ -91,7 +92,11 @@ type Bootstrap struct {
 	s *fasthttp.Server
 }
 
-func New(clusterService *cluster.Service, clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService) *Bootstrap {
+func New(
+	clusterService *cluster.Service,
+	clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService,
+	indicesService *indices.Service,
+) *Bootstrap {
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
 	c.pathTrie.insert("/", actions.MethodHandlers{
@@ -120,17 +125,33 @@ func New(clusterService *cluster.Service, clusterMetadataCreateIndexService *clu
 		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
-		actions.POST: &actions.RestIndexDoc{},
+		actions.POST: &actions.RestIndexDoc{
+			ClusterService: clusterService,
+			IndicesService: indicesService,
+		},
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.GET:    &actions.RestGetDoc{},
-		actions.PUT:    &actions.RestIndexDocId{},
-		actions.HEAD:   &actions.RestHeadDoc{},
-		actions.DELETE: &actions.RestDeleteDoc{},
+		actions.GET: &actions.RestGetDoc{
+			ClusterService: clusterService,
+			IndicesService: indicesService,
+		},
+		actions.PUT: &actions.RestIndexDocId{
+			ClusterService: clusterService,
+			IndicesService: indicesService,
+		},
+		actions.HEAD: &actions.RestHeadDoc{},
+		actions.DELETE: &actions.RestDeleteDoc{
+			ClusterService: clusterService,
+			IndicesService: indicesService,
+		},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
-		actions.GET: &actions.RestIndexSearch{},
+		actions.GET: &actions.RestSearch{},
 	})
+	//c.pathTrie.insert("/{index}/_bulk", actions.MethodHandlers{
+	//	actions.POST: ,
+	//	actions.PUT: ,
+	//})
 
 	s := &fasthttp.Server{
 		Handler: c.HandleFastHTTP,
