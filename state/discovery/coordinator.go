@@ -17,7 +17,7 @@ const (
 
 type Coordinator struct {
 	TransportService *transport.Service
-	PeerFinder       CoordinatorPeerFinder
+	PeerFinder       *CoordinatorPeerFinder
 	PersistedState   state.PersistedState
 
 	CoordinationState     state.CoordinationState
@@ -33,7 +33,7 @@ func NewCoordinator(transportService *transport.Service, clusterApplierService *
 		TransportService:      transportService,
 		ClusterApplierService: clusterApplierService,
 		MasterService:         masterService,
-		PersistedState:        persistedState,
+		PeerFinder:            NewCoordinatorPeerFinder(transportService),
 	}
 	c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
 
@@ -61,7 +61,7 @@ func (c *Coordinator) Start() {
 }
 
 func (c *Coordinator) StartInitialJoin() {
-	c.becomeCandidate("startInital")
+	c.becomeCandidate("startInitial")
 }
 
 func (c *Coordinator) becomeCandidate(method string) {
@@ -72,7 +72,6 @@ func (c *Coordinator) becomeCandidate(method string) {
 }
 
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
-	c.mode = LEADER
 	if c.mode != LEADER {
 		return
 	}
@@ -99,8 +98,16 @@ func (c *Coordinator) HandlePublish(req []byte) {
 }
 
 type CoordinatorPeerFinder struct {
+	TransportService  *transport.Service
 	LastAcceptedNodes *state.Nodes
 	active            bool
+	peersByAddress    map[string]*Peer
+}
+
+func NewCoordinatorPeerFinder(transportService *transport.Service) *CoordinatorPeerFinder {
+	return &CoordinatorPeerFinder{
+		TransportService: transportService,
+	}
 }
 
 func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
@@ -110,9 +117,50 @@ func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
 }
 
 func (f *CoordinatorPeerFinder) handleWakeUp() {
+	// "localhost:8080" 기준
+	seedHosts := []string{"localhost:8081", "localhost:8082"}
+
+	for _, host := range seedHosts {
+		f.startProbe(host)
+	}
 
 }
 
+func (f *CoordinatorPeerFinder) startProbe(address string) {
+	for key, _ := range f.peersByAddress {
+		if key == address {
+			return
+		}
+	}
+	peer := f.createConnectingPeer(address)
+	f.peersByAddress[address] = peer
+}
+
+func (f *CoordinatorPeerFinder) createConnectingPeer(address string) *Peer {
+	// f.TransportService.
+
+	/*
+		peer := NewPeer(address)
+		peer.establishConnection()
+		return peer
+	*/
+}
+
 func (f *CoordinatorPeerFinder) onFoundPeersUpdated() {
+
+}
+
+type Peer struct {
+	address       string
+	discoveryNode state.Node
+}
+
+func NewPeer(address string) *Peer {
+	return &Peer{
+		address: address,
+	}
+}
+
+func (p *Peer) establishConnection() {
 
 }
