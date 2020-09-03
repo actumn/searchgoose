@@ -26,7 +26,7 @@ func start() {
 	//port := "8180"
 	port := "8181"
 
-	go transport.Start(port)
+	transport.Start(port)
 	time.Sleep(time.Duration(15) * time.Second)
 
 	//seedHosts := []string{"localhost:8180", "localhost:8181"} //8179
