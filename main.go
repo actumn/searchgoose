@@ -15,23 +15,25 @@ func main() {
 func start() {
 
 	nodeId := cluster.GenerateNodeId()
-	transport := tcp.NewTransport(nodeId)
 
 	// TODO :: Handshake 로직은 어디에서 관리되어야 할까
 
 	log.Printf("[Node Id] : %s\n", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
-	//port := "8179"
-	//port := "8180"
-	port := "8181"
 
-	transport.Start(port)
-	time.Sleep(time.Duration(15) * time.Second)
+	//address := "localhost:8179"
+	//address := "localhost:8180"
+	address := "localhost:8181"
 
 	//seedHosts := []string{"localhost:8180", "localhost:8181"} //8179
 	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
 	seedHosts := []string{"localhost:8179", "localhost:8180"} //8181
+
+	transport := tcp.NewTransport(address, nodeId, seedHosts)
+
+	transport.Start(address)
+	time.Sleep(time.Duration(15) * time.Second)
 
 	log.Printf("Start handshaking\n")
 
@@ -40,6 +42,8 @@ func start() {
 		// Open connection
 		transport.OpenConnection(seedHost, connections)
 	}
+
+	time.Sleep(time.Duration(20) * time.Second)
 
 	// Handshake 동작 보기 위해서 잠시 주석 처리
 	/*
