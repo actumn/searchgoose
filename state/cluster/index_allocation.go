@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"fmt"
 	"github.com/actumn/searchgoose/state"
 	"math"
 )
@@ -51,7 +50,6 @@ func (s *AllocationService) reroute(clusterState state.ClusterState) state.Clust
 			minNode.Add(*shard)
 		}
 	}
-	fmt.Println()
 
 	// generate routing table based on routing nodes
 	newRoutingTable := state.RoutingTable{
