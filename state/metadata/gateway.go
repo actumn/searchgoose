@@ -31,6 +31,12 @@ func (m *GatewayMetaState) Start(
 			Nodes: map[string]*state.Node{
 				transportService.LocalNode.Id: transportService.LocalNode,
 			},
+			MasterNodes: map[string]*state.Node{
+				transportService.LocalNode.Id: transportService.LocalNode,
+			},
+			DataNodes: map[string]*state.Node{
+				transportService.LocalNode.Id: transportService.LocalNode,
+			},
 			LocalNodeId: transportService.LocalNode.Id,
 		},
 		Version:  onDiskState.LastAcceptedVersion,

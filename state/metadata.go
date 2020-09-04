@@ -14,7 +14,7 @@ type ClusterState struct {
 	Nodes     *Nodes
 	Metadata  Metadata
 	//Blocks    ClusterBlocks
-	//RoutingTable RoutingTable
+	RoutingTable RoutingTable
 }
 
 func (c *ClusterState) ToBytes() []byte {
@@ -97,3 +97,30 @@ type MappingMetadata struct {
 //
 //type CoordinationMetadata struct {
 //}
+
+type RoutingTable struct {
+	IndicesRouting map[string]IndexRoutingTable
+}
+
+type IndexRoutingTable struct {
+	Index  Index
+	Shards map[int]IndexShardRoutingTable
+}
+
+type IndexShardRoutingTable struct {
+	ShardId ShardId
+	Primary ShardRouting
+	//Replicas []ShardRouting
+}
+
+type ShardId struct {
+	Index   Index
+	ShardId int
+}
+
+type ShardRouting struct {
+	ShardId       ShardId
+	CurrentNodeId string
+	//RelocatingNodeId string
+	Primary bool
+}
