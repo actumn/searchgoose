@@ -42,8 +42,7 @@ func (s *Service) UpdateMapping(metadata state.IndexMetadata) {
 	}
 }
 
-func (s *Service) CreateShard() {
-	shardId := 0
+func (s *Service) CreateShard(shardId int) {
 	shard := NewShard("./data/"+s.uuid+"/"+strconv.Itoa(shardId), s.indexMapping)
 	s.shards[shardId] = shard
 }
