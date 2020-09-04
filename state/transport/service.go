@@ -2,19 +2,44 @@ package transport
 
 import (
 	"github.com/actumn/searchgoose/state"
+	"github.com/actumn/searchgoose/state/transport/tcp"
+	"log"
+	"net"
+	"time"
 )
 
 type Service struct {
 	LocalNode         *state.Node
 	requestHandlers   map[string]RequestHandler
 	ConnectionManager map[string]Connection
+	transport         *tcp.Transport
 }
 
-func NewService(id string) *Service {
+func NewService(id string, transport *tcp.Transport) *Service {
 	return &Service{
 		LocalNode:       state.CreateLocalNode(id),
 		requestHandlers: map[string]RequestHandler{},
+		transport:       transport,
 	}
+}
+
+func (s *Service) Start() {
+	address := s.transport.LocalAddress
+	s.transport.Start(address)
+
+	time.Sleep(time.Duration(15) * time.Second)
+
+	log.Printf("Start handshaking\n")
+
+	seedHosts := s.transport.SeedHosts
+	connections := make(chan *net.Conn)
+	for _, seedHost := range seedHosts {
+		// Open connection
+		s.transport.OpenConnection(seedHost, connections)
+	}
+
+	time.Sleep(time.Duration(20) * time.Second)
+
 }
 
 func (s *Service) NodeConnected(node *state.Node) bool {
@@ -47,4 +72,6 @@ type Transport interface {
 */
 
 type Connection interface {
+	getNode()
+	sendRequest()
 }

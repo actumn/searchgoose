@@ -11,17 +11,15 @@ import (
 type Transport struct {
 	LocalAddress   string
 	LocalNodeId    string
+	SeedHosts      []string
 	ConnectedNodes map[string]*net.Conn // nodeId -> outbound connection (outbound nodes에서 관리 )
 }
 
 func NewTransport(address string, nodeId string, seedHosts []string) *Transport {
-	hostMap := map[string]string{}
-	for _, host := range seedHosts {
-		hostMap[host] = ""
-	}
 	return &Transport{
 		LocalAddress:   address,
 		LocalNodeId:    nodeId,
+		SeedHosts:      seedHosts,
 		ConnectedNodes: map[string]*net.Conn{},
 	}
 }

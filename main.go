@@ -2,10 +2,9 @@ package main
 
 import (
 	"github.com/actumn/searchgoose/state/cluster"
+	"github.com/actumn/searchgoose/state/transport"
 	"github.com/actumn/searchgoose/state/transport/tcp"
 	"log"
-	"net"
-	"time"
 )
 
 func main() {
@@ -15,13 +14,9 @@ func main() {
 func start() {
 
 	nodeId := cluster.GenerateNodeId()
-
-	// TODO :: Handshake 로직은 어디에서 관리되어야 할까
-
 	log.Printf("[Node Id] : %s\n", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
-
 	//address := "localhost:8179"
 	//address := "localhost:8180"
 	address := "localhost:8181"
@@ -30,24 +25,11 @@ func start() {
 	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
 	seedHosts := []string{"localhost:8179", "localhost:8180"} //8181
 
-	transport := tcp.NewTransport(address, nodeId, seedHosts)
+	tcpTransport := tcp.NewTransport(address, nodeId, seedHosts)
+	transportService := transport.NewService(nodeId, tcpTransport)
+	transportService.Start()
 
-	transport.Start(address)
-	time.Sleep(time.Duration(15) * time.Second)
-
-	log.Printf("Start handshaking\n")
-
-	connections := make(chan *net.Conn)
-	for _, seedHost := range seedHosts {
-		// Open connection
-		transport.OpenConnection(seedHost, connections)
-	}
-
-	time.Sleep(time.Duration(20) * time.Second)
-
-	// Handshake 동작 보기 위해서 잠시 주석 처리
 	/*
-		transportService := transport.NewService(nodeId)
 		clusterService := cluster.NewService()
 		persistClusterStateService := persist.NewClusterStateService()
 
@@ -76,5 +58,6 @@ func start() {
 		if err := b.Start(); err != nil {
 			panic(err)
 		}
+
 	*/
 }
