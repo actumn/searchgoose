@@ -86,31 +86,29 @@ func (t *Transport) OpenConnection(destAddress string, c chan *net.Conn) {
 	message := handShakeData.ToBytes()
 
 	// TODO :: ACK를 받을 때 까지 계속 보내? 아니지 1분 정도는 connection 시도를 하자
-	ch := make(chan string)
-	go func(conn net.Conn, message []byte, ch chan<- string) {
-		// Send REQ
-		log.Printf("Send REQ to %s\n", destAddress)
-		conn.Write(message)
 
-		// Wait ACK
-		recvBuf := make([]byte, 4096)
-		n, err := conn.Read(recvBuf)
-		if err != nil {
-			log.Fatalf("Fail to get ACK from %s; err: %v", destAddress, err)
-			return
-		}
-		data := DataFormatFromBytes(recvBuf[:n])
-		log.Printf("Receive ACK from %s\n", string(data.Content))
+	// Send REQ
+	log.Printf("Send REQ to %s\n", destAddress)
+	conn.Write(message)
 
-		ch <- string(data.Content)
-	}(conn, message, ch)
+	// Wait ACK
+	recvBuf := make([]byte, 4096)
+	n, err := conn.Read(recvBuf)
+	if err != nil {
+		log.Fatalf("Fail to get ACK from %s; err: %v", destAddress, err)
+		return
+	}
 
-	nodeId := <-ch
+	data := DataFormatFromBytes(recvBuf[:n])
+	nodeId := string(data.Content)
+	log.Printf("Receive ACK from %s\n", string(data.Content))
+
 	t.ConnectedNodes[nodeId] = &conn
 
 	log.Printf("Finished handshaking with %s\n", nodeId)
 }
 
+// TODO :: Action type string으로 바꾸기
 type Action int
 
 const (
