@@ -1,13 +1,9 @@
 package main
 
 import (
-	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
-	"github.com/actumn/searchgoose/state/discovery"
-	"github.com/actumn/searchgoose/state/indices"
-	"github.com/actumn/searchgoose/state/metadata"
-	"github.com/actumn/searchgoose/state/persist"
 	"github.com/actumn/searchgoose/state/transport"
+	"github.com/actumn/searchgoose/state/transport/tcp"
 	"log"
 )
 
@@ -16,35 +12,52 @@ func main() {
 }
 
 func start() {
+
 	nodeId := cluster.GenerateNodeId()
+	log.Printf("[Node Id] : %s\n", nodeId)
 
-	transportService := transport.NewService(nodeId)
-	clusterService := cluster.NewService()
-	persistClusterStateService := persist.NewClusterStateService()
+	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
+	//address := "localhost:8179"
+	//address := "localhost:8180"
+	address := "localhost:8181"
 
-	gateway := metadata.NewGatewayMetaState()
-	gateway.Start(transportService, clusterService, persistClusterStateService)
+	//seedHosts := []string{"localhost:8180", "localhost:8181"} //8179
+	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
+	seedHosts := []string{"localhost:8179", "localhost:8180"} //8181
 
-	coordinator := discovery.NewCoordinator(transportService, clusterService.ApplierService, clusterService.MasterService, gateway.PersistedState)
+	tcpTransport := tcp.NewTransport(address, nodeId, seedHosts)
+	transportService := transport.NewService(nodeId, tcpTransport)
+	transportService.Start()
 
-	indicesService := indices.NewService()
-	indicesClusterStateService := indices.NewClusterStateService(indicesService)
+	/*
+		clusterService := cluster.NewService()
+		persistClusterStateService := persist.NewClusterStateService()
 
-	clusterService.ApplierService.AddApplier(indicesClusterStateService.ApplyClusterState)
-	clusterService.MasterService.ClusterStatePublish = coordinator.Publish
+		gateway := metadata.NewGatewayMetaState()
+		gateway.Start(transportService, clusterService, persistClusterStateService)
 
-	clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService)
+		coordinator := discovery.NewCoordinator(transportService, clusterService.ApplierService, clusterService.MasterService, gateway.PersistedState)
 
-	gateway.Start(
-		transportService,
-		clusterService,
-		persistClusterStateService,
-	)
-	coordinator.Start()
+		indicesService := indices.NewService()
+		indicesClusterStateService := indices.NewClusterStateService(indicesService)
 
-	b := http.New(clusterService, clusterMetadataCreateIndexService)
-	log.Println("start server...")
-	if err := b.Start(); err != nil {
-		panic(err)
-	}
+		clusterService.ApplierService.AddApplier(indicesClusterStateService.ApplyClusterState)
+		clusterService.MasterService.ClusterStatePublish = coordinator.Publish
+
+		clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService)
+
+		gateway.Start(
+			transportService,
+			clusterService,
+			persistClusterStateService,
+		)
+		coordinator.Start()
+
+		b := http.New(clusterService, clusterMetadataCreateIndexService)
+		log.Println("start server...")
+		if err := b.Start(); err != nil {
+			panic(err)
+		}
+
+	*/
 }
