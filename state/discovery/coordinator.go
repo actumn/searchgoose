@@ -4,6 +4,7 @@ import (
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/transport"
+	"log"
 )
 
 type Mode int
@@ -31,9 +32,10 @@ type Coordinator struct {
 func NewCoordinator(transportService *transport.Service, clusterApplierService *cluster.ApplierService, masterService *cluster.MasterService, persistedState state.PersistedState) *Coordinator {
 	c := &Coordinator{
 		TransportService:      transportService,
+		PeerFinder:            NewCoordinatorPeerFinder(transportService),
 		ClusterApplierService: clusterApplierService,
 		MasterService:         masterService,
-		PeerFinder:            NewCoordinatorPeerFinder(transportService),
+		PersistedState:        persistedState,
 	}
 	c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
 
@@ -61,7 +63,7 @@ func (c *Coordinator) Start() {
 }
 
 func (c *Coordinator) StartInitialJoin() {
-	c.becomeCandidate("startInitial")
+	c.becomeCandidate("start_initial")
 }
 
 func (c *Coordinator) becomeCandidate(method string) {
@@ -72,6 +74,7 @@ func (c *Coordinator) becomeCandidate(method string) {
 }
 
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
+	c.mode = LEADER
 	if c.mode != LEADER {
 		return
 	}
@@ -98,16 +101,19 @@ func (c *Coordinator) HandlePublish(req []byte) {
 }
 
 type CoordinatorPeerFinder struct {
-	TransportService  *transport.Service
+	transportService  *transport.Service
 	LastAcceptedNodes *state.Nodes
+	PeersByAddress    map[string]*Peer
 	active            bool
-	peersByAddress    map[string]*Peer
 }
 
 func NewCoordinatorPeerFinder(transportService *transport.Service) *CoordinatorPeerFinder {
-	return &CoordinatorPeerFinder{
-		TransportService: transportService,
+	f := &CoordinatorPeerFinder{
+		transportService: transportService,
 	}
+
+	f.transportService.RegisterRequestHandler("request_peers", f.handlePeersRequest)
+	return f
 }
 
 func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
@@ -117,50 +123,53 @@ func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
 }
 
 func (f *CoordinatorPeerFinder) handleWakeUp() {
-	// "localhost:8080" 기준
-	seedHosts := []string{"localhost:8081", "localhost:8082"}
 
-	for _, host := range seedHosts {
-		f.startProbe(host)
+	// TODO :: persistedState 에서 getLastAcceptedNodes 가져 와서 startProbe
+
+	// TODO :: 나중에 seed_hosts 등은 setting 에서 가져 오게 하도록 짜는 게 좋을듯 하다
+	providedAddr := f.transportService.Transport.SeedHosts
+	for _, address := range providedAddr {
+		f.startProbe(address)
 	}
-
 }
 
 func (f *CoordinatorPeerFinder) startProbe(address string) {
-	for key, _ := range f.peersByAddress {
-		if key == address {
-			return
-		}
+	if _, ok := f.PeersByAddress[address]; !ok {
+		peer := f.createConnectingPeer(address)
+		f.PeersByAddress[address] = peer
 	}
-	peer := f.createConnectingPeer(address)
-	f.peersByAddress[address] = peer
 }
 
 func (f *CoordinatorPeerFinder) createConnectingPeer(address string) *Peer {
-	// f.TransportService.
-
-	/*
-		peer := NewPeer(address)
-		peer.establishConnection()
-		return peer
-	*/
+	peer := &Peer{
+		address: address,
+	}
+	peer.establishConnection()
+	return peer
 }
 
 func (f *CoordinatorPeerFinder) onFoundPeersUpdated() {
 
 }
 
-type Peer struct {
-	address       string
-	discoveryNode state.Node
+func (f *CoordinatorPeerFinder) handlePeersRequest(req []byte) {
+
 }
 
-func NewPeer(address string) *Peer {
-	return &Peer{
-		address: address,
-	}
+type Peer struct {
+	address       string
+	discoveryNode *state.Node
 }
 
 func (p *Peer) establishConnection() {
+
+	log.Printf("Attempting connection to %s\n", p.address)
+
+	// connectToRemoteMasterNode
+	// p.discoveryNode.set(remoteNode);
+	// requestPeers();
+}
+
+func (p *Peer) requestPeers() {
 
 }
