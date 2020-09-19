@@ -87,7 +87,7 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	}
 }
 
-func (c *Coordinator) HandlePublish(req []byte) {
+func (c *Coordinator) HandlePublish(req []byte) []byte {
 	// handle publish
 	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.LocalNode)
 	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()
@@ -98,6 +98,8 @@ func (c *Coordinator) HandlePublish(req []byte) {
 	c.ApplierState = acceptedState
 	c.MasterService.ClusterState = acceptedState
 	c.ClusterApplierService.OnNewState(acceptedState)
+
+	return []byte{}
 }
 
 type CoordinatorPeerFinder struct {
@@ -141,10 +143,15 @@ func (f *CoordinatorPeerFinder) startProbe(address string) {
 }
 
 func (f *CoordinatorPeerFinder) createConnectingPeer(address string) *Peer {
+	log.Printf("Attempting connection to %s\n", address)
+
+	remoteNode := f.establishConnection(address)
 	peer := &Peer{
-		address: address,
+		address:       address,
+		discoveryNode: remoteNode,
 	}
-	peer.establishConnection()
+	peer.requestPeers()
+
 	return peer
 }
 
@@ -152,22 +159,17 @@ func (f *CoordinatorPeerFinder) onFoundPeersUpdated() {
 
 }
 
-func (f *CoordinatorPeerFinder) handlePeersRequest(req []byte) {
+func (f *CoordinatorPeerFinder) establishConnection(address string) *state.Node {
+	return f.transportService.ConnectToRemoteMasterNode(address)
+}
+
+func (f *CoordinatorPeerFinder) handlePeersRequest(req []byte) []byte {
 
 }
 
 type Peer struct {
 	address       string
 	discoveryNode *state.Node
-}
-
-func (p *Peer) establishConnection() {
-
-	log.Printf("Attempting connection to %s\n", p.address)
-
-	// connectToRemoteMasterNode
-	// p.discoveryNode.set(remoteNode);
-	// requestPeers();
 }
 
 func (p *Peer) requestPeers() {

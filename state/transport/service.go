@@ -10,17 +10,18 @@ import (
 
 type Service struct {
 	LocalNode         *state.Node
-	RequestHandlers   map[string]RequestHandler
 	ConnectionManager map[string]Connection
 	Transport         *tcp.Transport
 }
 
 func NewService(id string, transport *tcp.Transport) *Service {
-	return &Service{
-		LocalNode:       state.CreateLocalNode(id),
-		RequestHandlers: map[string]RequestHandler{},
-		Transport:       transport,
+	address := transport.LocalAddress
+	service := &Service{
+		LocalNode: state.CreateLocalNode(id, address),
+		Transport: transport,
 	}
+	service.RegisterRequestHandler(tcp.HANDSHAKE_REQ, service.handleHandShake)
+	return service
 }
 
 func (s *Service) Start() {
@@ -28,36 +29,64 @@ func (s *Service) Start() {
 	s.Transport.Start(address)
 
 	time.Sleep(time.Duration(15) * time.Second)
+}
 
-	log.Printf("Start handshaking\n")
+func (s *Service) SendRequestConn(conn Connection, action string, req []byte, callback func(response []byte)) {
+	//// local node
+	// handler := s.Transport.RequestHandlers[action]
+	// handler(req)
 
-	seedHosts := s.Transport.SeedHosts
-	connections := make(chan *net.Conn)
-	for _, seedHost := range seedHosts {
-		// Open connection
-		s.Transport.OpenConnection(seedHost, connections)
+	conn.SendRequest(req, callback)
+}
+
+func (s *Service) SendRequest(node *state.Node, action string, req []byte, callback func(response []byte)) {
+	conn := s.ConnectionManager[node.Id]
+	s.SendRequestConn(conn, action, req, callback)
+}
+
+func (s *Service) RegisterRequestHandler(action string, handler tcp.RequestHandler) {
+	s.Transport.Register(action, handler)
+}
+
+func (s *Service) ConnectToRemoteMasterNode(address string) *state.Node {
+
+	nowNode := s.LocalNode
+	connectedNode := state.Node{}
+
+	s.Transport.OpenConnection(address, func(conn Connection) {
+		handShakeData := tcp.DataFormat{
+			Source:  nowNode.HostAddress,
+			Dest:    address,
+			Action:  tcp.HANDSHAKE_REQ,
+			Content: nowNode.ToBytes(),
+		}
+		request := handShakeData.ToBytes()
+		s.SendRequestConn(conn, tcp.HANDSHAKE_REQ, request, func(response []byte) {
+			node := state.NodeFromBytes(response)
+			connectedNode = *node
+			s.ConnectionManager[node.Id] = conn
+		})
+	})
+	return &connectedNode
+}
+
+func (s *Service) handleHandShake(conn net.Conn, req []byte) []byte {
+	reqNode := state.NodeFromBytes(req)
+	log.Printf("Receive handshake REQ from %s\n", reqNode.Id)
+
+	nowNode := s.LocalNode
+	handShakeData := tcp.DataFormat{
+		Source:  nowNode.HostAddress,
+		Action:  tcp.HANDSHAKE_ACK,
+		Content: nowNode.ToBytes(),
 	}
 
-	time.Sleep(time.Duration(20) * time.Second)
-
-}
-
-func (s *Service) SendRequest(node state.Node, action string, req []byte) {
-	// local node
-	handler := s.RequestHandlers[action]
-	handler(req)
-	// TODO :: send request to remote node
-}
-
-func (s *Service) RegisterRequestHandler(action string, handler RequestHandler) {
-	s.RequestHandlers[action] = handler
+	return handShakeData.ToBytes()
 }
 
 func (s *Service) openConnection() {
 
 }
-
-type RequestHandler func(req []byte)
 
 /*
 type Transport interface {
@@ -65,6 +94,16 @@ type Transport interface {
 */
 
 type Connection interface {
-	getNode()
-	sendRequest()
+	SendRequest(req []byte, callback func(byte []byte))
+}
+
+type LocalConnection struct {
+}
+
+func (c *LocalConnection) GetNode() {
+
+}
+
+func (c *LocalConnection) SendRequest(req []byte) {
+	//handler.sdfsadfsadfsadf
 }
