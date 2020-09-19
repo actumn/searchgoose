@@ -1,6 +1,8 @@
 package transport
 
 import (
+	"bytes"
+	"encoding/gob"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/transport/tcp"
 	"log"
@@ -21,6 +23,7 @@ func NewService(id string, transport *tcp.Transport) *Service {
 		Transport: transport,
 	}
 	service.RegisterRequestHandler(tcp.HANDSHAKE_REQ, service.handleHandShake)
+	service.RegisterRequestHandler(tcp.PEERFIND_REQ, service.HandlePeersRequest)
 	return service
 }
 
@@ -39,7 +42,7 @@ func (s *Service) SendRequestConn(conn Connection, action string, req []byte, ca
 	conn.SendRequest(req, callback)
 }
 
-func (s *Service) SendRequest(node *state.Node, action string, req []byte, callback func(response []byte)) {
+func (s *Service) SendRequest(node state.Node, action string, req []byte, callback func(response []byte)) {
 	conn := s.ConnectionManager[node.Id]
 	s.SendRequestConn(conn, action, req, callback)
 }
@@ -48,7 +51,7 @@ func (s *Service) RegisterRequestHandler(action string, handler tcp.RequestHandl
 	s.Transport.Register(action, handler)
 }
 
-func (s *Service) ConnectToRemoteMasterNode(address string) *state.Node {
+func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node state.Node)) {
 
 	nowNode := s.LocalNode
 	connectedNode := state.Node{}
@@ -67,7 +70,7 @@ func (s *Service) ConnectToRemoteMasterNode(address string) *state.Node {
 			s.ConnectionManager[node.Id] = conn
 		})
 	})
-	return &connectedNode
+	callback(connectedNode)
 }
 
 func (s *Service) handleHandShake(conn net.Conn, req []byte) []byte {
@@ -84,6 +87,64 @@ func (s *Service) handleHandShake(conn net.Conn, req []byte) []byte {
 	return handShakeData.ToBytes()
 }
 
+func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state.Node {
+	// knownNodes => peersByAddress에서 가져오렴
+
+	content := PeersRequest{
+		knownPeers: knownPeers,
+	}
+
+	nowNode := s.LocalNode
+	peerFindData := tcp.DataFormat{
+		Source:  nowNode.HostAddress,
+		Dest:    node.HostAddress,
+		Action:  tcp.PEERFIND_REQ,
+		Content: content.ToBytes(),
+	}
+
+	// TODO :: 나중에 request handler interface로 뽑아내기
+	request := peerFindData.ToBytes()
+	var peers []state.Node
+	s.SendRequest(node, tcp.PEERFIND_REQ, request, func(response []byte) {
+		peers = PeersResponseFromBytes(response).knownPeers
+		log.Printf("%s received %s", s.LocalNode.HostAddress, peers)
+		// response.getMasterNode().map(DiscoveryNode::getAddress).ifPresent(PeerFinder.this::startProbe);
+		// response.getKnownPeers().stream().map(DiscoveryNode::getAddress).forEach(PeerFinder.this::startProbe);
+	})
+	return peers
+}
+
+func (s *Service) HandlePeersRequest(conn net.Conn, req []byte) []byte {
+
+}
+
+type PeersRequest struct {
+	knownPeers []state.Node
+}
+
+func (r *PeersRequest) ToBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		log.Fatalln(err)
+	}
+	return buffer.Bytes()
+}
+
+type PeersResponse struct {
+	masterNode state.Node
+	knownPeers []state.Node
+}
+
+func PeersResponseFromBytes(b []byte) *PeersResponse {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var data PeersResponse
+	if err := decoder.Decode(&data); err != nil {
+		log.Fatalln(err)
+	}
+	return &data
+}
 func (s *Service) openConnection() {
 
 }

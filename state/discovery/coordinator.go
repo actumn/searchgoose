@@ -73,6 +73,7 @@ func (c *Coordinator) becomeCandidate(method string) {
 	}
 }
 
+/*
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	c.mode = LEADER
 	if c.mode != LEADER {
@@ -86,6 +87,8 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 		c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes())
 	}
 }
+
+*/
 
 func (c *Coordinator) HandlePublish(req []byte) []byte {
 	// handle publish
@@ -105,7 +108,7 @@ func (c *Coordinator) HandlePublish(req []byte) []byte {
 type CoordinatorPeerFinder struct {
 	transportService  *transport.Service
 	LastAcceptedNodes *state.Nodes
-	PeersByAddress    map[string]*Peer
+	PeersByAddress    map[string]*state.Node
 	active            bool
 }
 
@@ -113,8 +116,6 @@ func NewCoordinatorPeerFinder(transportService *transport.Service) *CoordinatorP
 	f := &CoordinatorPeerFinder{
 		transportService: transportService,
 	}
-
-	f.transportService.RegisterRequestHandler("request_peers", f.handlePeersRequest)
 	return f
 }
 
@@ -142,36 +143,33 @@ func (f *CoordinatorPeerFinder) startProbe(address string) {
 	}
 }
 
-func (f *CoordinatorPeerFinder) createConnectingPeer(address string) *Peer {
+func (f *CoordinatorPeerFinder) createConnectingPeer(address string) *state.Node {
+	// 여기서 Peer 만드셈
 	log.Printf("Attempting connection to %s\n", address)
-
-	remoteNode := f.establishConnection(address)
-	peer := &Peer{
-		address:       address,
-		discoveryNode: remoteNode,
-	}
-	peer.requestPeers()
-
-	return peer
-}
-
-func (f *CoordinatorPeerFinder) onFoundPeersUpdated() {
-
+	return f.establishConnection(address)
 }
 
 func (f *CoordinatorPeerFinder) establishConnection(address string) *state.Node {
-	return f.transportService.ConnectToRemoteMasterNode(address)
+	// Handshaking
+	node := &state.Node{}
+	f.transportService.ConnectToRemoteMasterNode(address, func(remoteNode state.Node) {
+		// Peer Finding
+		node = &remoteNode
+		knownPeers := f.getKnownPeers()
+		remotePeers := f.transportService.RequestPeers(remoteNode, knownPeers)
+
+		for _, peer := range remotePeers {
+			f.startProbe(peer.HostAddress)
+		}
+
+	})
+	return node
 }
 
-func (f *CoordinatorPeerFinder) handlePeersRequest(req []byte) []byte {
-
-}
-
-type Peer struct {
-	address       string
-	discoveryNode *state.Node
-}
-
-func (p *Peer) requestPeers() {
-
+func (f *CoordinatorPeerFinder) getKnownPeers() []state.Node {
+	values := make([]state.Node, 0, len(f.PeersByAddress))
+	for _, v := range f.PeersByAddress {
+		values = append(values, *v)
+	}
+	return values
 }
