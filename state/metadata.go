@@ -61,8 +61,8 @@ const (
 )
 
 type Metadata struct {
-	ClusterUUID string
-	Version     int64
+	//ClusterUUID string
+	//Version     int64
 	//Coordination CoordinationMetadata
 	Indices map[string]IndexMetadata
 	//Templates    map[string]IndexTemplateMetadata
@@ -74,12 +74,12 @@ type Index struct {
 }
 
 type IndexMetadata struct {
-	Index              Index
-	RoutingNumShards   int
-	RoutingNumReplicas int
-	Version            int64
-	State              IndexMetadataState
-	Mapping            map[string]MappingMetadata
+	Index            Index
+	RoutingNumShards int
+	//RoutingNumReplicas int
+	//Version            int64
+	//State              IndexMetadataState
+	Mapping map[string]MappingMetadata
 	//Settings Settings
 }
 

@@ -19,24 +19,18 @@ func TestAllocationService_reroute(t *testing.T) {
 				"testNodeId1": {
 					Name:        "node1",
 					Id:          "testNodeId1",
-					HostName:    "",
 					HostAddress: "",
-					Attributes:  nil,
 				},
 				"testNodeId2": {
 					Name:        "node2",
 					Id:          "testNodeId2",
-					HostName:    "",
 					HostAddress: "",
-					Attributes:  nil,
 				},
 
 				"testNodeId3": {
 					Name:        "node3",
 					Id:          "testNodeId3",
-					HostName:    "",
 					HostAddress: "",
-					Attributes:  nil,
 				},
 			},
 		},
