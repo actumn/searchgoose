@@ -3,6 +3,7 @@ package cluster
 import (
 	"github.com/actumn/searchgoose/common"
 	"github.com/actumn/searchgoose/state"
+	"log"
 )
 
 type CreateIndexClusterStateUpdateRequest struct {
@@ -24,6 +25,8 @@ func NewMetadataCreateIndexService(clusterService state.ClusterService, allocati
 }
 
 func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpdateRequest) {
+	log.Printf("Create index - index name: %s, mapping: %s\n", req.Index, string(req.Mappings))
+
 	s.ClusterService.SubmitStateUpdateTask(func(current state.ClusterState) state.ClusterState {
 		return s.applyCreateIndex(current, req)
 	})
@@ -32,13 +35,11 @@ func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpda
 func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState, req CreateIndexClusterStateUpdateRequest) state.ClusterState {
 	// prepare indexMetadata
 	indexMetadata := state.IndexMetadata{
-		State: state.OPEN,
 		Index: state.Index{
 			Name: req.Index,
 			Uuid: common.RandomBase64(),
 		},
-		RoutingNumShards:   1, // TODO :: get RoutingNumShards from req
-		RoutingNumReplicas: 0,
+		RoutingNumShards: 3, // TODO :: get RoutingNumShards from req
 		Mapping: map[string]state.MappingMetadata{
 			"_doc": {
 				Type:   "_doc",
@@ -48,8 +49,6 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 	}
 
 	metadata := state.Metadata{
-		ClusterUUID: current.Metadata.ClusterUUID,
-		Version:     current.Metadata.Version,
 		Indices: map[string]state.IndexMetadata{
 			indexMetadata.Index.Name: indexMetadata,
 		},

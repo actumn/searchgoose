@@ -85,16 +85,17 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	nodes := newState.Nodes
 
 	for _, node := range nodes.Nodes {
-		// c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes())
-		fmt.Println(node)
+		log.Println("publish new state to node[" + node.Id + "]")
+		c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes())
 	}
+	log.Println("publish ended successfully")
 }
 
 func (c *Coordinator) HandlePublish(req []byte) []byte {
 	// handle publish
 	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.LocalNode)
 	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()
-
+	log.Println("accept new state ")
 	c.CoordinationState.PersistedState.SetLastAcceptedState(acceptedState)
 
 	// handle commit
