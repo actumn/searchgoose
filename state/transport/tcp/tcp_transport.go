@@ -3,7 +3,6 @@ package tcp
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/actumn/searchgoose/state/transport"
 	"io"
 	"log"
 	"net"
@@ -16,6 +15,10 @@ type Transport struct {
 	LocalNodeId     string
 	SeedHosts       []string
 	RequestHandlers map[string]RequestHandler
+}
+
+type IConnection interface {
+	SendRequest(req []byte, callback func(byte []byte))
 }
 
 type Connection struct {
@@ -32,7 +35,8 @@ func (c *Connection) SendRequest(req []byte, callback func(byte []byte)) {
 		n, err := c.conn.Read(recvBuf)
 
 		if err != nil {
-			log.Fatalf("Fail to get response from %s; err: %v", address, err)
+			// log.Fatalf("Fail to get response from %s; err: %v", address, err)
+			log.Fatalf("Fail to get response; err: %v", err)
 			return
 		}
 
@@ -43,9 +47,10 @@ func (c *Connection) SendRequest(req []byte, callback func(byte []byte)) {
 
 func NewTransport(address string, nodeId string, seedHosts []string) *Transport {
 	return &Transport{
-		LocalAddress: address,
-		LocalNodeId:  nodeId,
-		SeedHosts:    seedHosts,
+		LocalAddress:    address,
+		LocalNodeId:     nodeId,
+		SeedHosts:       seedHosts,
+		RequestHandlers: make(map[string]RequestHandler),
 	}
 }
 
@@ -84,7 +89,6 @@ func (t *Transport) Start(address string) {
 				if 0 < n {
 					// Receive request data
 					recvData := DataFormatFromBytes(recvBuf[:n])
-					log.Printf("Receive REQ from %s\n", recvData.Source)
 					action := recvData.Action
 					data := recvData.Content
 
@@ -97,15 +101,13 @@ func (t *Transport) Start(address string) {
 	}()
 }
 
-func (t *Transport) OpenConnection(address string, callback func(conn transport.Connection)) {
+func (t *Transport) OpenConnection(address string, callback func(conn IConnection)) {
 
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Fatalf("Failed to connect to %s : %v", address, err)
 	}
 	log.Printf("Success on connecting %s\n", address)
-
-	// t.ConnectedNodes[recvNode.Id] = &conn
 
 	callback(&Connection{
 		conn: conn,

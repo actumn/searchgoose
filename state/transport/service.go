@@ -11,16 +11,18 @@ import (
 )
 
 type Service struct {
-	LocalNode         *state.Node
-	ConnectionManager map[string]Connection
+	LocalNode *state.Node
+	// ConnectionManager map[string]Connection
+	ConnectionManager map[state.Node]tcp.IConnection
 	Transport         *tcp.Transport
 }
 
 func NewService(id string, transport *tcp.Transport) *Service {
 	address := transport.LocalAddress
 	service := &Service{
-		LocalNode: state.CreateLocalNode(id, address),
-		Transport: transport,
+		LocalNode:         state.CreateLocalNode(id, address),
+		ConnectionManager: make(map[state.Node]tcp.IConnection),
+		Transport:         transport,
 	}
 	service.RegisterRequestHandler(tcp.HANDSHAKE_REQ, service.handleHandShake)
 	service.RegisterRequestHandler(tcp.PEERFIND_REQ, service.HandlePeersRequest)
@@ -34,7 +36,7 @@ func (s *Service) Start() {
 	time.Sleep(time.Duration(15) * time.Second)
 }
 
-func (s *Service) SendRequestConn(conn Connection, action string, req []byte, callback func(response []byte)) {
+func (s *Service) SendRequestConn(conn tcp.IConnection, action string, req []byte, callback func(response []byte)) {
 	//// local node
 	// handler := s.Transport.RequestHandlers[action]
 	// handler(req)
@@ -43,7 +45,7 @@ func (s *Service) SendRequestConn(conn Connection, action string, req []byte, ca
 }
 
 func (s *Service) SendRequest(node state.Node, action string, req []byte, callback func(response []byte)) {
-	conn := s.ConnectionManager[node.Id]
+	conn := s.ConnectionManager[node]
 	s.SendRequestConn(conn, action, req, callback)
 }
 
@@ -56,26 +58,32 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 	nowNode := s.LocalNode
 	connectedNode := state.Node{}
 
-	s.Transport.OpenConnection(address, func(conn Connection) {
+	s.Transport.OpenConnection(address, func(conn tcp.IConnection) {
 		handShakeData := tcp.DataFormat{
 			Source:  nowNode.HostAddress,
 			Dest:    address,
 			Action:  tcp.HANDSHAKE_REQ,
 			Content: nowNode.ToBytes(),
 		}
+		log.Printf("Send handshake REQ to %s\n", address)
 		request := handShakeData.ToBytes()
 		s.SendRequestConn(conn, tcp.HANDSHAKE_REQ, request, func(response []byte) {
 			node := state.NodeFromBytes(response)
 			connectedNode = *node
-			s.ConnectionManager[node.Id] = conn
+			s.ConnectionManager[connectedNode] = conn
 		})
 	})
+
+	log.Printf("Connected with  %s\n", address)
+	time.Sleep(time.Duration(10) * time.Second)
+
 	callback(connectedNode)
+
 }
 
 func (s *Service) handleHandShake(conn net.Conn, req []byte) []byte {
 	reqNode := state.NodeFromBytes(req)
-	log.Printf("Receive handshake REQ from %s\n", reqNode.Id)
+	log.Printf("Receive handshake REQ from %s\n", reqNode.HostAddress)
 
 	nowNode := s.LocalNode
 	handShakeData := tcp.DataFormat{
@@ -91,10 +99,12 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 	// knownNodes => peersByAddress에서 가져오렴
 
 	content := PeersRequest{
-		knownPeers: knownPeers,
+		SourceNode: *s.LocalNode,
+		KnownPeers: knownPeers,
 	}
 
 	nowNode := s.LocalNode
+	log.Printf("Send Peer Finding REQ to %s\n", node.HostAddress)
 	peerFindData := tcp.DataFormat{
 		Source:  nowNode.HostAddress,
 		Dest:    node.HostAddress,
@@ -106,20 +116,39 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 	request := peerFindData.ToBytes()
 	var peers []state.Node
 	s.SendRequest(node, tcp.PEERFIND_REQ, request, func(response []byte) {
-		peers = PeersResponseFromBytes(response).knownPeers
+		peers = PeersResponseFromBytes(response).KnownPeers
 		log.Printf("%s received %s", s.LocalNode.HostAddress, peers)
-		// response.getMasterNode().map(DiscoveryNode::getAddress).ifPresent(PeerFinder.this::startProbe);
-		// response.getKnownPeers().stream().map(DiscoveryNode::getAddress).forEach(PeerFinder.this::startProbe);
 	})
+
 	return peers
 }
 
 func (s *Service) HandlePeersRequest(conn net.Conn, req []byte) []byte {
+	request := PeersRequestFromBytes(req)
+	log.Printf("Receive Peer Finding REQ from %s\n", request.SourceNode.Id)
 
+	knownPeers := make([]state.Node, 0, len(s.ConnectionManager))
+	for peer := range s.ConnectionManager {
+		knownPeers = append(knownPeers, peer)
+	}
+
+	nowNode := s.LocalNode
+	response := PeersResponse{
+		KnownPeers: knownPeers,
+	}
+
+	handShakeData := tcp.DataFormat{
+		Source:  nowNode.HostAddress,
+		Action:  tcp.PEERFIND_ACK,
+		Content: response.ToBytes(),
+	}
+
+	return handShakeData.ToBytes()
 }
 
 type PeersRequest struct {
-	knownPeers []state.Node
+	SourceNode state.Node
+	KnownPeers []state.Node
 }
 
 func (r *PeersRequest) ToBytes() []byte {
@@ -131,9 +160,28 @@ func (r *PeersRequest) ToBytes() []byte {
 	return buffer.Bytes()
 }
 
+func PeersRequestFromBytes(b []byte) *PeersRequest {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var data PeersRequest
+	if err := decoder.Decode(&data); err != nil {
+		log.Fatalln(err)
+	}
+	return &data
+}
+
 type PeersResponse struct {
-	masterNode state.Node
-	knownPeers []state.Node
+	MasterNode state.Node
+	KnownPeers []state.Node
+}
+
+func (r *PeersResponse) ToBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		log.Fatalln(err)
+	}
+	return buffer.Bytes()
 }
 
 func PeersResponseFromBytes(b []byte) *PeersResponse {
@@ -153,10 +201,6 @@ func (s *Service) openConnection() {
 type Transport interface {
 }
 */
-
-type Connection interface {
-	SendRequest(req []byte, callback func(byte []byte))
-}
 
 type LocalConnection struct {
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/discovery"
@@ -56,9 +57,11 @@ func start() {
 	coordinator.StartInitialJoin()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService)
-	log.Println("start server...")
-	if err := b.Start(); err != nil {
-		panic(err)
-	}
-
+	fmt.Println(b)
+	/*
+		log.Println("start server...")
+		if err := b.Start(); err != nil {
+			panic(err)
+		}
+	*/
 }

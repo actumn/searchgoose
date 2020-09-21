@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"fmt"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/transport"
@@ -37,7 +38,8 @@ func NewCoordinator(transportService *transport.Service, clusterApplierService *
 		MasterService:         masterService,
 		PersistedState:        persistedState,
 	}
-	c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
+
+	// c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
 
 	return c
 }
@@ -48,7 +50,7 @@ func (c *Coordinator) Start() {
 		PersistedState: c.PersistedState,
 	}
 
-	c.ApplierState = c.PersistedState.GetLastAcceptedState()
+	//c.ApplierState = c.PersistedState.GetLastAcceptedState()
 	//c.ApplierState = &state.ClusterState{
 	//	Name: "searchgoose-testClusters",
 	//	Nodes: &state.Nodes{
@@ -73,7 +75,6 @@ func (c *Coordinator) becomeCandidate(method string) {
 	}
 }
 
-/*
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	c.mode = LEADER
 	if c.mode != LEADER {
@@ -84,11 +85,10 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	nodes := newState.Nodes
 
 	for _, node := range nodes.Nodes {
-		c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes())
+		// c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes())
+		fmt.Println(node)
 	}
 }
-
-*/
 
 func (c *Coordinator) HandlePublish(req []byte) []byte {
 	// handle publish
@@ -115,6 +115,7 @@ type CoordinatorPeerFinder struct {
 func NewCoordinatorPeerFinder(transportService *transport.Service) *CoordinatorPeerFinder {
 	f := &CoordinatorPeerFinder{
 		transportService: transportService,
+		PeersByAddress:   make(map[string]*state.Node),
 	}
 	return f
 }
@@ -126,10 +127,6 @@ func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
 }
 
 func (f *CoordinatorPeerFinder) handleWakeUp() {
-
-	// TODO :: persistedState 에서 getLastAcceptedNodes 가져 와서 startProbe
-
-	// TODO :: 나중에 seed_hosts 등은 setting 에서 가져 오게 하도록 짜는 게 좋을듯 하다
 	providedAddr := f.transportService.Transport.SeedHosts
 	for _, address := range providedAddr {
 		f.startProbe(address)
@@ -155,7 +152,9 @@ func (f *CoordinatorPeerFinder) establishConnection(address string) *state.Node 
 	f.transportService.ConnectToRemoteMasterNode(address, func(remoteNode state.Node) {
 		// Peer Finding
 		node = &remoteNode
-		knownPeers := f.getKnownPeers()
+		knownPeers := f.getConnectedPeers()
+		log.Printf("[Known Peers] %s\n", knownPeers)
+
 		remotePeers := f.transportService.RequestPeers(remoteNode, knownPeers)
 
 		for _, peer := range remotePeers {
@@ -166,8 +165,8 @@ func (f *CoordinatorPeerFinder) establishConnection(address string) *state.Node 
 	return node
 }
 
-func (f *CoordinatorPeerFinder) getKnownPeers() []state.Node {
-	values := make([]state.Node, 0, len(f.PeersByAddress))
+func (f *CoordinatorPeerFinder) getConnectedPeers() []state.Node {
+	values := make([]state.Node, 0, len(f.transportService.ConnectionManager))
 	for _, v := range f.PeersByAddress {
 		values = append(values, *v)
 	}
