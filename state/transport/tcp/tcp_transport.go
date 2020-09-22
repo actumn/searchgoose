@@ -1,24 +1,17 @@
 package tcp
 
 import (
-	"bytes"
-	"encoding/gob"
+	"github.com/actumn/searchgoose/state/transport"
 	"io"
 	"log"
 	"net"
 )
 
-type RequestHandler func(conn net.Conn, req []byte) []byte
-
 type Transport struct {
 	LocalAddress    string
 	LocalNodeId     string
 	SeedHosts       []string
-	RequestHandlers map[string]RequestHandler
-}
-
-type IConnection interface {
-	SendRequest(req []byte, callback func(byte []byte))
+	RequestHandlers map[string]transport.RequestHandler
 }
 
 type Connection struct {
@@ -40,7 +33,7 @@ func (c *Connection) SendRequest(req []byte, callback func(byte []byte)) {
 			return
 		}
 
-		data := DataFormatFromBytes(recvBuf[:n])
+		data := transport.DataFormatFromBytes(recvBuf[:n])
 		callback(data.Content)
 	}()
 }
@@ -50,11 +43,11 @@ func NewTransport(address string, nodeId string, seedHosts []string) *Transport 
 		LocalAddress:    address,
 		LocalNodeId:     nodeId,
 		SeedHosts:       seedHosts,
-		RequestHandlers: make(map[string]RequestHandler),
+		RequestHandlers: make(map[string]transport.RequestHandler),
 	}
 }
 
-func (t *Transport) Register(action string, handler RequestHandler) {
+func (t *Transport) Register(action string, handler transport.RequestHandler) {
 	t.RequestHandlers[action] = handler
 }
 
@@ -88,7 +81,7 @@ func (t *Transport) Start(address string) {
 				}
 				if 0 < n {
 					// Receive request data
-					recvData := DataFormatFromBytes(recvBuf[:n])
+					recvData := transport.DataFormatFromBytes(recvBuf[:n])
 					action := recvData.Action
 					data := recvData.Content
 
@@ -101,7 +94,7 @@ func (t *Transport) Start(address string) {
 	}()
 }
 
-func (t *Transport) OpenConnection(address string, callback func(conn IConnection)) {
+func (t *Transport) OpenConnection(address string, callback func(conn transport.Connection)) {
 
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -114,39 +107,10 @@ func (t *Transport) OpenConnection(address string, callback func(conn IConnectio
 	})
 }
 
-// TODO :: Action type string으로 바꾸기
-
-const (
-	HANDSHAKE_REQ  = "handshake_req"
-	HANDSHAKE_ACK  = "handshake_ack"
-	HANDSHAKE_FAIL = "handshake_fail"
-	PEERFIND_REQ   = "peerfind_req"
-	PEERFIND_ACK   = "peerfind_ack"
-	PEERFIND_FAIL  = "peerfind_fail"
-)
-
-type DataFormat struct {
-	Source  string
-	Dest    string
-	Action  string
-	Content []byte
+func (t *Transport) GetLocalAddress() string {
+	return t.LocalAddress
 }
 
-func (d *DataFormat) ToBytes() []byte {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	if err := enc.Encode(d); err != nil {
-		log.Fatalln(err)
-	}
-	return buffer.Bytes()
-}
-
-func DataFormatFromBytes(b []byte) *DataFormat {
-	buffer := bytes.NewBuffer(b)
-	decoder := gob.NewDecoder(buffer)
-	var data DataFormat
-	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
-	}
-	return &data
+func (t *Transport) GetSeedHosts() []string {
+	return t.SeedHosts
 }

@@ -31,7 +31,9 @@ func start() {
 	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
 	seedHosts := []string{"localhost:8180"} //8181
 
-	tcpTransport := tcp.NewTransport(address, nodeId, seedHosts)
+	var tcpTransport transport.Transport
+
+	tcpTransport = tcp.NewTransport(address, nodeId, seedHosts)
 	transportService := transport.NewService(nodeId, tcpTransport)
 	transportService.Start()
 

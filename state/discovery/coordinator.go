@@ -127,7 +127,7 @@ func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
 }
 
 func (f *CoordinatorPeerFinder) handleWakeUp() {
-	providedAddr := f.transportService.Transport.SeedHosts
+	providedAddr := f.transportService.Transport.GetSeedHosts()
 	for _, address := range providedAddr {
 		f.startProbe(address)
 	}
