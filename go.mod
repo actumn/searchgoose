@@ -16,4 +16,5 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c // indirect
 	github.com/valyala/fasthttp v1.15.1
+	github.com/nqd/flat v0.1.0
 )
