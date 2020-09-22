@@ -7,9 +7,9 @@ import (
 
 type NameExpressionResolver struct{}
 
-func (r *NameExpressionResolver) concreteIndexNames(clusterState state.ClusterState, expression string) []string {
+func (r *NameExpressionResolver) ConcreteIndexNames(clusterState state.ClusterState, expression string) []string {
 	var indexResult []string
-	indiceResult := r.concreteIndices(clusterState, expression)
+	indiceResult := r.ConcreteIndices(clusterState, expression)
 
 	if strings.HasSuffix(expression, "*") {
 		trimmedExpresion := strings.TrimSuffix(expression, "*")
@@ -29,7 +29,7 @@ func (r *NameExpressionResolver) concreteIndexNames(clusterState state.ClusterSt
 	return indexResult
 }
 
-func (r *NameExpressionResolver) concreteIndices(clusterState state.ClusterState, expression string) []state.Index {
+func (r *NameExpressionResolver) ConcreteIndices(clusterState state.ClusterState, expression string) []state.Index {
 	var indiceResult []state.Index
 
 	if strings.HasSuffix(expression, "*") {
