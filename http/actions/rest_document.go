@@ -34,8 +34,9 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 	uuid := index.Uuid
 
 	indexService, _ := h.IndicesService.IndexService(uuid)
-	shard := cluster.IndexShard(*clusterState, index.Name, documentId).Primary
-	indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	//shard := cluster.IndexShard(*clusterState, index.Name, documentId).Primary
+	//indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	indexShard, _ := indexService.Shard(0)
 	if err := indexShard.Index(documentId, body); err != nil {
 		log.Fatalln(err)
 	}
@@ -85,8 +86,9 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 	uuid := index.Uuid
 
 	indexService, _ := h.IndicesService.IndexService(uuid)
-	shard := cluster.IndexShard(*clusterState, index.Name, documentId).Primary
-	indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	//shard := cluster.IndexShard(*clusterState, index.Name, documentId).Primary
+	//indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	indexShard, _ := indexService.Shard(0)
 	if err := indexShard.Index(documentId, body); err != nil {
 		log.Fatalln(err)
 	}
@@ -125,8 +127,9 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 	uuid := index.Uuid
 
 	indexService, _ := h.IndicesService.IndexService(uuid)
-	shard := cluster.GetShards(*clusterState, index.Name, documentId).Primary
-	indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	//shard := cluster.GetShards(*clusterState, index.Name, documentId).Primary
+	//indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	indexShard, _ := indexService.Shard(0)
 	if doc, err := indexShard.Get(documentId); err != nil {
 		reply(RestResponse{
 			StatusCode: 400,
@@ -175,8 +178,9 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 	uuid := index.Uuid
 
 	indexService, _ := h.IndicesService.IndexService(uuid)
-	shard := cluster.GetShards(*clusterState, index.Name, documentId).Primary
-	indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	//shard := cluster.GetShards(*clusterState, index.Name, documentId).Primary
+	//indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
+	indexShard, _ := indexService.Shard(0)
 	if err := indexShard.Delete(documentId); err != nil {
 		log.Fatalln(err)
 	}

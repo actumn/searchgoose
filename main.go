@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/discovery"

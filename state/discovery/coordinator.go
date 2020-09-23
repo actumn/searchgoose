@@ -1,7 +1,6 @@
 package discovery
 
 import (
-	"fmt"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/transport"
@@ -86,7 +85,9 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 
 	for _, node := range nodes.Nodes {
 		log.Println("publish new state to node[" + node.Id + "]")
-		c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes())
+		c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes(), func(response []byte) {
+
+		})
 	}
 	log.Println("publish ended successfully")
 }
