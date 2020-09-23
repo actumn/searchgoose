@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (s *Shard) SearchTypeMatch(searchType interface{}) (query *query.MatchQuery) {
+func (s *Shard) SearchTypeMatch(searchType interface{}) *query.MatchQuery {
 	m := searchType.(map[string]interface{})
 	var field, message string
 	for key, value := range m {
@@ -16,11 +16,10 @@ func (s *Shard) SearchTypeMatch(searchType interface{}) (query *query.MatchQuery
 	}
 	queryString := field + ":\"" + message + "\""
 
-	query = bleve.NewMatchQuery(queryString)
-	return query
+	return bleve.NewMatchQuery(queryString)
 }
 
-func (s *Shard) SearchTypeMatchPhrase(searchType interface{}) (query *query.MatchPhraseQuery) {
+func (s *Shard) SearchTypeMatchPhrase(searchType interface{}) *query.MatchPhraseQuery {
 	m := searchType.(map[string]interface{})
 	var field, message string
 	for key, value := range m {
@@ -29,11 +28,10 @@ func (s *Shard) SearchTypeMatchPhrase(searchType interface{}) (query *query.Matc
 	}
 	queryString := field + ":\"" + message + "\""
 
-	query = bleve.NewMatchPhraseQuery(queryString)
-	return query
+	return bleve.NewMatchPhraseQuery(queryString)
 }
 
-func (s *Shard) SearchTypePrefix(searchType interface{}) (query *query.PrefixQuery) {
+func (s *Shard) SearchTypePrefix(searchType interface{}) *query.PrefixQuery {
 	m := searchType.(map[string]interface{})
 	var field, message string
 	for key, value := range m {
@@ -42,11 +40,10 @@ func (s *Shard) SearchTypePrefix(searchType interface{}) (query *query.PrefixQue
 	}
 	queryString := field + ":\"" + message + "\""
 
-	query = bleve.NewPrefixQuery(strings.ToLower(queryString))
-	return query
+	return bleve.NewPrefixQuery(strings.ToLower(queryString))
 }
 
-func (s *Shard) SearchTypeFuzzy(searchType interface{}) (query *query.FuzzyQuery) {
+func (s *Shard) SearchTypeFuzzy(searchType interface{}) *query.FuzzyQuery {
 	m := searchType.(map[string]interface{})
 	var field, message string
 	for key, value := range m {
@@ -55,11 +52,10 @@ func (s *Shard) SearchTypeFuzzy(searchType interface{}) (query *query.FuzzyQuery
 	}
 	queryString := field + ":\"" + message + "\""
 
-	query = bleve.NewFuzzyQuery(strings.ToLower(queryString))
-	return query
+	return bleve.NewFuzzyQuery(strings.ToLower(queryString))
 }
 
-func (s *Shard) SearchTypeNumericRange(searchType interface{}) (query *query.ConjunctionQuery) {
+func (s *Shard) SearchTypeNumericRange(searchType interface{}) *query.ConjunctionQuery {
 	m := searchType.(map[string]interface{})
 	var field string
 	var message map[string]interface{}
@@ -98,13 +94,12 @@ func (s *Shard) SearchTypeNumericRange(searchType interface{}) (query *query.Con
 	}
 	gtQuery := bleve.NewQueryStringQuery(gtString)
 	ltQuery := bleve.NewQueryStringQuery(ltString)
-	query = bleve.NewConjunctionQuery(gtQuery, ltQuery)
-	return query
+	return bleve.NewConjunctionQuery(gtQuery, ltQuery)
 }
 
-func (s *Shard) SearchTypeBool(searchType interface{}) (query *query.BooleanQuery) {
+func (s *Shard) SearchTypeBool(searchType interface{}) *query.BooleanQuery {
 	m := searchType.(map[string]interface{})
-	query = bleve.NewBooleanQuery()
+	searchQuery := bleve.NewBooleanQuery()
 	var mustSearch, mustNotSearch, shouldSearch map[string]interface{}
 	for key, value := range m {
 		if key == "must" {
@@ -117,42 +112,42 @@ func (s *Shard) SearchTypeBool(searchType interface{}) (query *query.BooleanQuer
 	}
 	for key, value := range mustSearch {
 		if key == "match" {
-			query.AddMust(s.SearchTypeMatch(value))
+			searchQuery.AddMust(s.SearchTypeMatch(value))
 		} else if key == "match_phrase" {
-			query.AddMust(s.SearchTypeMatchPhrase(value))
+			searchQuery.AddMust(s.SearchTypeMatchPhrase(value))
 		} else if key == "prefix" {
-			query.AddMust(s.SearchTypePrefix(value))
+			searchQuery.AddMust(s.SearchTypePrefix(value))
 		} else if key == "fuzzy" {
-			query.AddMust(s.SearchTypeFuzzy(value))
+			searchQuery.AddMust(s.SearchTypeFuzzy(value))
 		} else if key == "range" {
-			query.AddMust(s.SearchTypeNumericRange(value))
+			searchQuery.AddMust(s.SearchTypeNumericRange(value))
 		}
 	}
 	for key, value := range mustNotSearch {
 		if key == "match" {
-			query.AddMustNot(s.SearchTypeMatch(value))
+			searchQuery.AddMustNot(s.SearchTypeMatch(value))
 		} else if key == "match_phrase" {
-			query.AddMustNot(s.SearchTypeMatchPhrase(value))
+			searchQuery.AddMustNot(s.SearchTypeMatchPhrase(value))
 		} else if key == "prefix" {
-			query.AddMustNot(s.SearchTypePrefix(value))
+			searchQuery.AddMustNot(s.SearchTypePrefix(value))
 		} else if key == "fuzzy" {
-			query.AddMustNot(s.SearchTypeFuzzy(value))
+			searchQuery.AddMustNot(s.SearchTypeFuzzy(value))
 		} else if key == "range" {
-			query.AddMustNot(s.SearchTypeNumericRange(value))
+			searchQuery.AddMustNot(s.SearchTypeNumericRange(value))
 		}
 	}
 	for key, value := range shouldSearch {
 		if key == "match" {
-			query.AddShould(s.SearchTypeMatch(value))
+			searchQuery.AddShould(s.SearchTypeMatch(value))
 		} else if key == "match_phrase" {
-			query.AddShould(s.SearchTypeMatchPhrase(value))
+			searchQuery.AddShould(s.SearchTypeMatchPhrase(value))
 		} else if key == "prefix" {
-			query.AddShould(s.SearchTypePrefix(value))
+			searchQuery.AddShould(s.SearchTypePrefix(value))
 		} else if key == "fuzzy" {
-			query.AddShould(s.SearchTypeFuzzy(value))
+			searchQuery.AddShould(s.SearchTypeFuzzy(value))
 		} else if key == "range" {
-			query.AddShould(s.SearchTypeNumericRange(value))
+			searchQuery.AddShould(s.SearchTypeNumericRange(value))
 		}
 	}
-	return query
+	return searchQuery
 }
