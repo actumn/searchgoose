@@ -1,27 +1,53 @@
 package tcp
 
 import (
-	"bytes"
-	"encoding/gob"
+	"github.com/actumn/searchgoose/state/transport"
 	"io"
 	"log"
 	"net"
 )
 
 type Transport struct {
-	LocalAddress   string
-	LocalNodeId    string
-	SeedHosts      []string
-	ConnectedNodes map[string]*net.Conn // nodeId -> outbound connection (outbound nodes에서 관리 )
+	LocalAddress    string
+	LocalNodeId     string
+	SeedHosts       []string
+	RequestHandlers map[string]transport.RequestHandler
+}
+
+type Connection struct {
+	conn net.Conn
+}
+
+func (c *Connection) SendRequest(req []byte, callback func(byte []byte)) {
+
+	c.conn.Write(req)
+
+	go func() {
+		recvBuf := make([]byte, 4096)
+		n, err := c.conn.Read(recvBuf)
+
+		if err != nil {
+			// log.Fatalf("Fail to get response from %s; err: %v", address, err)
+			log.Fatalf("Fail to get response; err: %v", err)
+			return
+		}
+
+		data := transport.DataFormatFromBytes(recvBuf[:n])
+		callback(data.Content)
+	}()
 }
 
 func NewTransport(address string, nodeId string, seedHosts []string) *Transport {
 	return &Transport{
-		LocalAddress:   address,
-		LocalNodeId:    nodeId,
-		SeedHosts:      seedHosts,
-		ConnectedNodes: map[string]*net.Conn{},
+		LocalAddress:    address,
+		LocalNodeId:     nodeId,
+		SeedHosts:       seedHosts,
+		RequestHandlers: make(map[string]transport.RequestHandler),
 	}
+}
+
+func (t *Transport) Register(action string, handler transport.RequestHandler) {
+	t.RequestHandlers[action] = handler
 }
 
 func (t *Transport) Start(address string) {
@@ -53,17 +79,13 @@ func (t *Transport) Start(address string) {
 					return
 				}
 				if 0 < n {
-					// Receive REQ
-					data := DataFormatFromBytes(recvBuf[:n])
-					log.Printf("Receive REQ from %s\n", data.Source)
-					handShakeData := DataFormat{
-						Source:  t.LocalAddress,
-						Action:  HANDSHAKE_ACK,
-						Content: []byte(t.LocalNodeId),
-					}
-					message := handShakeData.ToBytes()
-					// Send ACK
-					log.Printf("Send ACK to %s\n", data.Source)
+					// Receive request data
+					recvData := transport.DataFormatFromBytes(recvBuf[:n])
+					action := recvData.Action
+					data := recvData.Content
+
+					// Send response data
+					message := t.RequestHandlers[action](conn, data)
 					conn.Write(message)
 				}
 			}(conn)
@@ -71,74 +93,23 @@ func (t *Transport) Start(address string) {
 	}()
 }
 
-func (t *Transport) OpenConnection(destAddress string, c chan *net.Conn) {
-	conn, err := net.Dial("tcp", destAddress)
+func (t *Transport) OpenConnection(address string, callback func(conn transport.Connection)) {
+
+	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		log.Fatalf("Failed to connect to %s : %v", destAddress, err)
+		log.Fatalf("Failed to connect to %s : %v", address, err)
 	}
-	log.Printf("Success on connecting %s\n", destAddress)
+	log.Printf("Success on connecting %s\n", address)
 
-	handShakeData := DataFormat{
-		Source:  t.LocalAddress,
-		Action:  HANDSHAKE_REQ,
-		Content: []byte(t.LocalNodeId),
-	}
-	message := handShakeData.ToBytes()
-
-	// TODO :: ACK를 받을 때 까지 계속 보내? 아니지 1분 정도는 connection 시도를 하자
-
-	// Send REQ
-	log.Printf("Send REQ to %s\n", destAddress)
-	conn.Write(message)
-
-	// Wait ACK
-	recvBuf := make([]byte, 4096)
-	n, err := conn.Read(recvBuf)
-	if err != nil {
-		log.Fatalf("Fail to get ACK from %s; err: %v", destAddress, err)
-		return
-	}
-
-	data := DataFormatFromBytes(recvBuf[:n])
-	nodeId := string(data.Content)
-	log.Printf("Receive ACK from %s\n", string(data.Content))
-
-	t.ConnectedNodes[nodeId] = &conn
-
-	log.Printf("Finished handshaking with %s\n", nodeId)
+	callback(&Connection{
+		conn: conn,
+	})
 }
 
-// TODO :: Action type string으로 바꾸기
-type Action int
-
-const (
-	HANDSHAKE_REQ Action = iota
-	HANDSHAKE_ACK
-	HANDSHAKE_FAIL
-)
-
-type DataFormat struct {
-	Source string
-	//Dest   string
-	Action  Action
-	Content []byte
+func (t *Transport) GetLocalAddress() string {
+	return t.LocalAddress
 }
 
-func (d *DataFormat) ToBytes() []byte {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	if err := enc.Encode(d); err != nil {
-		log.Fatalln(err)
-	}
-	return buffer.Bytes()
-}
-
-func DataFormatFromBytes(b []byte) *DataFormat {
-	buffer := bytes.NewBuffer(b)
-	decoder := gob.NewDecoder(buffer)
-	var data DataFormat
-	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
-	}
-	return &data
+func (t *Transport) GetSeedHosts() []string {
+	return t.SeedHosts
 }

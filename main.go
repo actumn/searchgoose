@@ -1,7 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
+	"github.com/actumn/searchgoose/state/discovery"
+	"github.com/actumn/searchgoose/state/indices"
+	"github.com/actumn/searchgoose/state/metadata"
+	"github.com/actumn/searchgoose/state/persist"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/actumn/searchgoose/state/transport/tcp"
 	"log"
@@ -17,47 +23,46 @@ func start() {
 	log.Printf("[Node Id] : %s\n", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
-	//address := "localhost:8179"
+	address := "localhost:8179"
 	//address := "localhost:8180"
-	address := "localhost:8181"
+	//address := "localhost:8181"
 
-	//seedHosts := []string{"localhost:8180", "localhost:8181"} //8179
+	seedHosts := []string{"localhost:8180"} //8179
 	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
-	seedHosts := []string{"localhost:8179", "localhost:8180"} //8181
+	//seedHosts := []string{"localhost:8180"} //8181
 
-	tcpTransport := tcp.NewTransport(address, nodeId, seedHosts)
+	var tcpTransport transport.Transport
+
+	tcpTransport = tcp.NewTransport(address, nodeId, seedHosts)
 	transportService := transport.NewService(nodeId, tcpTransport)
-	transportService.Start()
+	//transportService.Start()
 
-	/*
-		clusterService := cluster.NewService()
-		persistClusterStateService := persist.NewClusterStateService()
+	clusterService := cluster.NewService()
+	persistClusterStateService := persist.NewClusterStateService()
 
-		gateway := metadata.NewGatewayMetaState()
-		gateway.Start(transportService, clusterService, persistClusterStateService)
+	gateway := metadata.NewGatewayMetaState()
+	gateway.Start(transportService, clusterService, persistClusterStateService)
 
-		coordinator := discovery.NewCoordinator(transportService, clusterService.ApplierService, clusterService.MasterService, gateway.PersistedState)
+	coordinator := discovery.NewCoordinator(transportService, clusterService.ApplierService, clusterService.MasterService, gateway.PersistedState)
 
-		indicesService := indices.NewService()
-		indicesClusterStateService := indices.NewClusterStateService(indicesService)
+	indicesService := indices.NewService()
+	indicesClusterStateService := indices.NewClusterStateService(indicesService)
 
-		clusterService.ApplierService.AddApplier(indicesClusterStateService.ApplyClusterState)
-		clusterService.MasterService.ClusterStatePublish = coordinator.Publish
+	clusterService.ApplierService.AddApplier(indicesClusterStateService.ApplyClusterState)
+	clusterService.MasterService.ClusterStatePublish = coordinator.Publish
 
-		clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService)
+	clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService)
 
-		gateway.Start(
-			transportService,
-			clusterService,
-			persistClusterStateService,
-		)
-		coordinator.Start()
+	gateway.Start(transportService, clusterService, persistClusterStateService)
 
-		b := http.New(clusterService, clusterMetadataCreateIndexService)
-		log.Println("start server...")
-		if err := b.Start(); err != nil {
-			panic(err)
-		}
+	//coordinator.Start()
+	//coordinator.StartInitialJoin()
 
-	*/
+	b := http.New(clusterService, clusterMetadataCreateIndexService)
+	fmt.Println(b)
+
+	log.Println("start server...")
+	if err := b.Start(); err != nil {
+		panic(err)
+	}
 }
