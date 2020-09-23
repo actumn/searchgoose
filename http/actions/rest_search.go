@@ -420,4 +420,3 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 }
-

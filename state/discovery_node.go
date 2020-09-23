@@ -67,6 +67,3 @@ type Nodes struct {
 func (n *Nodes) MasterNode() *Node {
 	return n.Nodes[n.MasterNodeId]
 }
-
-type RoutingTable struct {
-}

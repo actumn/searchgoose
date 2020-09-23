@@ -52,7 +52,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 	if request.Path == "/favicon.ico" {
 		return
 	}
-	log.Println(string(ctx.Method()) + " " + request.Path)
+	log.Println(request.Path)
 	allHandlers := c.pathTrie.retrieveAll(request.Path)
 	for {
 		h, params, err := allHandlers()

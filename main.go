@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/discovery"
@@ -50,7 +49,8 @@ func start() {
 	clusterService.ApplierService.AddApplier(indicesClusterStateService.ApplyClusterState)
 	clusterService.MasterService.ClusterStatePublish = coordinator.Publish
 
-	clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService)
+	allocationService := cluster.NewAllocationService()
+	clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService, allocationService)
 
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
