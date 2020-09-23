@@ -77,10 +77,9 @@ func (c *Coordinator) becomeCandidate(method string) {
 }
 
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
-	c.mode = LEADER
-	if c.mode != LEADER {
-		return
-	}
+	//if c.mode != LEADER {
+	//	return
+	//}
 
 	newState := event.State
 	nodes := newState.Nodes

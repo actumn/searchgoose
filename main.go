@@ -18,7 +18,6 @@ func main() {
 }
 
 func start() {
-
 	nodeId := cluster.GenerateNodeId()
 	log.Printf("[Node Id] : %s\n", nodeId)
 
@@ -58,9 +57,7 @@ func start() {
 	//coordinator.Start()
 	//coordinator.StartInitialJoin()
 
-	b := http.New(clusterService, clusterMetadataCreateIndexService)
-	fmt.Println(b)
-
+	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService)
 	log.Println("start server...")
 	if err := b.Start(); err != nil {
 		panic(err)

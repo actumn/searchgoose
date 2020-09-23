@@ -66,14 +66,14 @@ func (h *RestPutIndex) Handle(r *RestRequest, reply ResponseListener) {
 	index := r.PathParams["index"]
 
 	var body map[string]interface{}
-	err := json.Unmarshal(r.Body, &body)
-	if err != nil {
+	if err := json.Unmarshal(r.Body, &body); err != nil {
 		reply(RestResponse{
 			StatusCode: 400,
 			Body: map[string]interface{}{
 				"err": err,
 			},
 		})
+		return
 	}
 
 	mapping, err := json.Marshal(body["mappings"])
