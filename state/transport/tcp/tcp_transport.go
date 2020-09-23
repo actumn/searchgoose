@@ -22,9 +22,8 @@ func (c *Connection) SendRequest(req []byte, callback func(byte []byte)) {
 
 	c.conn.Write(req)
 
-	recvBuf := make([]byte, 4096)
-
 	go func() {
+		recvBuf := make([]byte, 4096)
 		n, err := c.conn.Read(recvBuf)
 
 		if err != nil {

@@ -23,19 +23,19 @@ func start() {
 	log.Printf("[Node Id] : %s\n", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
-	//address := "localhost:8179"
+	address := "localhost:8179"
 	//address := "localhost:8180"
-	address := "localhost:8181"
+	//address := "localhost:8181"
 
-	//seedHosts := []string{"localhost:8180"} //8179
+	seedHosts := []string{"localhost:8180"} //8179
 	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
-	seedHosts := []string{"localhost:8180"} //8181
+	//seedHosts := []string{"localhost:8180"} //8181
 
 	var tcpTransport transport.Transport
 
 	tcpTransport = tcp.NewTransport(address, nodeId, seedHosts)
 	transportService := transport.NewService(nodeId, tcpTransport)
-	transportService.Start()
+	//transportService.Start()
 
 	clusterService := cluster.NewService()
 	persistClusterStateService := persist.NewClusterStateService()
@@ -55,15 +55,14 @@ func start() {
 
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
-	coordinator.Start()
-	coordinator.StartInitialJoin()
+	//coordinator.Start()
+	//coordinator.StartInitialJoin()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService)
 	fmt.Println(b)
-	/*
-		log.Println("start server...")
-		if err := b.Start(); err != nil {
-			panic(err)
-		}
-	*/
+
+	log.Println("start server...")
+	if err := b.Start(); err != nil {
+		panic(err)
+	}
 }

@@ -57,7 +57,7 @@ func (s *Service) Start() {
 	address := s.Transport.GetLocalAddress()
 	s.Transport.Start(address)
 
-	time.Sleep(time.Duration(15) * time.Second)
+	// time.Sleep(time.Duration(15) * time.Second)
 }
 
 func (s *Service) SendRequestConn(conn Connection, action string, req []byte, callback func(response []byte)) {
@@ -135,6 +135,8 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 		Action:  PEERFIND_REQ,
 		Content: content.ToBytes(),
 	}
+
+	log.Printf("[%s] %s\n", PEERFIND_REQ, content)
 
 	// TODO :: 나중에 request handler interface로 뽑아내기
 	request := peerFindData.ToBytes()

@@ -6,6 +6,7 @@ import (
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/transport"
 	"log"
+	"sync"
 )
 
 type Mode int
@@ -128,9 +129,16 @@ func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
 
 func (f *CoordinatorPeerFinder) handleWakeUp() {
 	providedAddr := f.transportService.Transport.GetSeedHosts()
+
+	var wg sync.WaitGroup
+	wg.Add(len(providedAddr))
+
 	for _, address := range providedAddr {
-		f.startProbe(address)
+		log.Printf("Attempting connection to %s\n", address)
+		go f.startProbe(address)
 	}
+
+	wg.Wait()
 }
 
 func (f *CoordinatorPeerFinder) startProbe(address string) {
@@ -142,7 +150,7 @@ func (f *CoordinatorPeerFinder) startProbe(address string) {
 
 func (f *CoordinatorPeerFinder) createConnectingPeer(address string) *state.Node {
 	// 여기서 Peer 만드셈
-	log.Printf("Attempting connection to %s\n", address)
+	// log.Printf("Attempting connection to %s\n", address)
 	return f.establishConnection(address)
 }
 
@@ -166,9 +174,10 @@ func (f *CoordinatorPeerFinder) establishConnection(address string) *state.Node 
 }
 
 func (f *CoordinatorPeerFinder) getConnectedPeers() []state.Node {
-	values := make([]state.Node, 0, len(f.transportService.ConnectionManager))
-	for _, v := range f.PeersByAddress {
-		values = append(values, *v)
+	mappings := f.transportService.ConnectionManager
+	values := make([]state.Node, 0, len(mappings))
+	for k, _ := range mappings {
+		values = append(values, k)
 	}
 	return values
 }
