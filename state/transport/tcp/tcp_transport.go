@@ -18,14 +18,12 @@ type Connection struct {
 	conn net.Conn
 }
 
-func (c *Connection) SendRequest(req []byte, callback func(byte []byte)) {
-
+func (c *Connection) SendRequest(action string, req []byte, callback func(byte []byte)) {
 	c.conn.Write(req)
 
 	go func() {
 		recvBuf := make([]byte, 4096)
 		n, err := c.conn.Read(recvBuf)
-
 		if err != nil {
 			// log.Fatalf("Fail to get response from %s; err: %v", address, err)
 			log.Fatalf("Fail to get response; err: %v", err)
@@ -35,6 +33,14 @@ func (c *Connection) SendRequest(req []byte, callback func(byte []byte)) {
 		data := transport.DataFormatFromBytes(recvBuf[:n])
 		callback(data.Content)
 	}()
+}
+
+type ReplyChannel struct {
+	conn net.Conn
+}
+
+func (c *ReplyChannel) SendMessage(b []byte) (n int, err error) {
+	return c.conn.Write(b)
 }
 
 func NewTransport(address string, nodeId string, seedHosts []string) *Transport {
@@ -85,7 +91,9 @@ func (t *Transport) Start(address string) {
 					data := recvData.Content
 
 					// Send response data
-					message := t.RequestHandlers[action](conn, data)
+					message := t.RequestHandlers[action](&ReplyChannel{
+						conn: conn,
+					}, data)
 					conn.Write(message)
 				}
 			}(conn)
@@ -94,7 +102,6 @@ func (t *Transport) Start(address string) {
 }
 
 func (t *Transport) OpenConnection(address string, callback func(conn transport.Connection)) {
-
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		log.Fatalf("Failed to connect to %s : %v", address, err)
@@ -112,4 +119,8 @@ func (t *Transport) GetLocalAddress() string {
 
 func (t *Transport) GetSeedHosts() []string {
 	return t.SeedHosts
+}
+
+func (t *Transport) GetHandler(action string) transport.RequestHandler {
+	return t.RequestHandlers[action]
 }
