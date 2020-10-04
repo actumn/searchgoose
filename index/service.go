@@ -36,8 +36,20 @@ func (s *Service) UpdateMapping(metadata state.IndexMetadata) {
 	properties := indexMapping["properties"].(map[string]interface{})
 	for field, fieldProps := range properties {
 		props := fieldProps.(map[string]interface{})
-		if props["type"] == "text" {
+
+		switch props["type"] {
+		case "text":
 			docMapping.AddFieldMappingsAt(field, mapping.NewTextFieldMapping())
+		case "integer":
+			docMapping.AddFieldMappingsAt(field, mapping.NewNumericFieldMapping())
+		case "float":
+			docMapping.AddFieldMappingsAt(field, mapping.NewNumericFieldMapping())
+		case "date":
+			docMapping.AddFieldMappingsAt(field, mapping.NewDateTimeFieldMapping())
+		case "boolean":
+			docMapping.AddFieldMappingsAt(field, mapping.NewBooleanFieldMapping())
+		case "geo_point":
+			docMapping.AddFieldMappingsAt(field, mapping.NewGeoPointFieldMapping())
 		}
 	}
 }
