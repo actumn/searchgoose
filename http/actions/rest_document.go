@@ -321,6 +321,34 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 
 }
 
+type deleteRequest struct {
+	Index   string
+	Id      string
+	ShardId state.ShardId
+}
+
+func (r *deleteRequest) toBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		log.Fatalln(err)
+	}
+	return buffer.Bytes()
+}
+
+func deleteRequestFromBytes(b []byte) *deleteRequest {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var req deleteRequest
+	if err := decoder.Decode(&req); err != nil {
+		log.Fatalln(err)
+	}
+	return &req
+}
+
+type deleteResponse struct {
+}
+
 type RestDeleteDoc struct {
 	clusterService   *cluster.Service
 	indicesService   *indices.Service
@@ -329,7 +357,18 @@ type RestDeleteDoc struct {
 
 func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestDeleteDoc {
 	transportService.RegisterRequestHandler(DeleteAction, func(channel transport.ReplyChannel, req []byte) []byte {
-		return []byte("")
+		log.Println("deleteAction on primary shard")
+		request := deleteRequestFromBytes(req)
+
+		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
+		indexShard, _ := indexService.Shard(request.ShardId.ShardId)
+
+		// TODO :: how to handle error on distributed system?
+		if err := indexShard.Delete(request.Id); err != nil {
+			log.Fatalln(err)
+		}
+
+		return []byte("success")
 	})
 
 	return &RestDeleteDoc{
@@ -343,35 +382,32 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 	indexName := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 
-	// TODO :: document routing on primary shard with RoutingTable
 	clusterState := h.clusterService.State()
-	index := clusterState.Metadata.Indices[indexName].Index
-	uuid := index.Uuid
-
-	indexService, _ := h.indicesService.IndexService(uuid)
-	//shard := cluster.GetShards(*clusterState, index.Name, documentId).Primary
-	//indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
-	indexShard, _ := indexService.Shard(0)
-	if err := indexShard.Delete(documentId); err != nil {
-		log.Fatalln(err)
+	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
+	deleteRequest := deleteRequest{
+		Index:   indexName,
+		Id:      documentId,
+		ShardId: shardRouting.ShardId,
 	}
 
-	reply(RestResponse{
-		StatusCode: 200,
-		Body: map[string]interface{}{
-			"_index":   indexName,
-			"_type":    "_doc",
-			"_id":      documentId,
-			"_version": 2,
-			"result":   "deleted",
-			"_shards": map[string]interface{}{
-				"total":      2,
-				"successful": 1,
-				"failed":     0,
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], DeleteAction, deleteRequest.toBytes(), func(response []byte) {
+		reply(RestResponse{
+			StatusCode: 200,
+			Body: map[string]interface{}{
+				"_index":   indexName,
+				"_type":    "_doc",
+				"_id":      documentId,
+				"_version": 2,
+				"result":   "deleted",
+				"_shards": map[string]interface{}{
+					"total":      2,
+					"successful": 1,
+					"failed":     0,
+				},
+				"_seq_no":       1,
+				"_primary_term": 1,
 			},
-			"_seq_no":       1,
-			"_primary_term": 1,
-		},
+		})
 	})
 }
 
