@@ -3,9 +3,7 @@ package state
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
-	"github.com/sirupsen/logrus"
-	"math/rand"
+	"log"
 )
 
 type Node struct {
@@ -21,9 +19,8 @@ type Node struct {
 }
 
 func CreateLocalNode(id string, address string) *Node {
-	nodeName := fmt.Sprintf("sg-node-%d", rand.Intn(10))
 	return &Node{
-		Name:        nodeName,
+		// Name:        nodeName,
 		Id:          id,
 		HostAddress: address,
 	}
