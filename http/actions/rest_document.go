@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	IndexAction = "indices_write"
+	IndexAction  = "indices:data/write/index"
+	GetAction    = "indices:data/read/get"
+	DeleteAction = "indices:data/write/delete"
 )
 
 type indexRequest struct {
@@ -46,9 +48,9 @@ type indexResponse struct {
 }
 
 type RestIndexDoc struct {
-	ClusterService   *cluster.Service
-	IndicesService   *indices.Service
-	TransportService *transport.Service
+	clusterService   *cluster.Service
+	indicesService   *indices.Service
+	transportService *transport.Service
 }
 
 func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDoc {
@@ -57,11 +59,7 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 		log.Println("indexAction on primary shard")
 		request := indexRequestFromBytes(req)
 
-		clusterState := clusterService.State()
-		index := clusterState.Metadata.Indices[request.Index].Index
-		uuid := index.Uuid
-
-		indexService, _ := indicesService.IndexService(uuid)
+		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
 		indexShard, _ := indexService.Shard(request.ShardId.ShardId)
 
 		var body map[string]interface{}
@@ -77,9 +75,9 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 	})
 
 	return &RestIndexDoc{
-		ClusterService:   clusterService,
-		IndicesService:   indicesService,
-		TransportService: transportService,
+		clusterService:   clusterService,
+		indicesService:   indicesService,
+		transportService: transportService,
 	}
 }
 
@@ -98,7 +96,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 	}
 
 	// TODO :: auto create index if absent.
-	clusterState := h.ClusterService.State()
+	clusterState := h.clusterService.State()
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
@@ -106,7 +104,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		Source:  r.Body,
 		ShardId: shardRouting.ShardId,
 	}
-	h.TransportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
 		log.Println("callback success")
 		reply(RestResponse{
 			StatusCode: 200,
@@ -129,9 +127,18 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type RestIndexDocId struct {
-	ClusterService   *cluster.Service
-	IndicesService   *indices.Service
-	TransportService *transport.Service
+	clusterService   *cluster.Service
+	indicesService   *indices.Service
+	transportService *transport.Service
+}
+
+func NewRestIndexDocId(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDocId {
+	// Handle primary shard request
+	return &RestIndexDocId{
+		clusterService:   clusterService,
+		indicesService:   indicesService,
+		transportService: transportService,
+	}
 }
 
 func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
@@ -149,7 +156,7 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 	}
 
 	// TODO :: auto create index if absent.
-	clusterState := h.ClusterService.State()
+	clusterState := h.clusterService.State()
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
@@ -157,7 +164,7 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 		Source:  r.Body,
 		ShardId: shardRouting.ShardId,
 	}
-	h.TransportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -178,33 +185,102 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 	})
 }
 
+type getRequest struct {
+	Index   string
+	Id      string
+	ShardId state.ShardId
+}
+
+func (r *getRequest) toBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		log.Fatalln(err)
+	}
+	return buffer.Bytes()
+}
+
+func getRequestFromBytes(b []byte) *getRequest {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var req getRequest
+	if err := decoder.Decode(&req); err != nil {
+		log.Fatalln(err)
+	}
+	return &req
+}
+
+type getResponse struct {
+	Index   string
+	Id      string
+	ShardId state.ShardId
+	Fields  map[string]interface{}
+}
+
+func (r *getResponse) toBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		log.Fatalln(err)
+	}
+	return buffer.Bytes()
+}
+
+func getResponseFromBytes(b []byte) *getResponse {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var res getResponse
+	if err := decoder.Decode(&res); err != nil {
+		log.Fatalln(err)
+	}
+	return &res
+}
+
 type RestGetDoc struct {
-	ClusterService *cluster.Service
-	IndicesService *indices.Service
+	clusterService   *cluster.Service
+	indicesService   *indices.Service
+	transportService *transport.Service
+}
+
+func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestGetDoc {
+	transportService.RegisterRequestHandler(GetAction, func(channel transport.ReplyChannel, req []byte) []byte {
+		log.Println("getAction on shard")
+		request := getRequestFromBytes(req)
+
+		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
+		indexShard, _ := indexService.Shard(request.ShardId.ShardId)
+
+		doc, _ := indexShard.Get(request.Id)
+		res := getResponse{
+			Index:   request.Index,
+			Id:      request.Id,
+			ShardId: request.ShardId,
+			Fields:  doc,
+		}
+
+		return res.toBytes()
+	})
+
+	return &RestGetDoc{
+		clusterService:   clusterService,
+		indicesService:   indicesService,
+		transportService: transportService,
+	}
 }
 
 func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 	indexName := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 
-	// TODO :: document routing on primary shard with RoutingTable
-	clusterState := h.ClusterService.State()
-	index := clusterState.Metadata.Indices[indexName].Index
-	uuid := index.Uuid
-
-	indexService, _ := h.IndicesService.IndexService(uuid)
-	//shard := cluster.GetShards(*clusterState, index.Name, documentId).Primary
-	//indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
-	indexShard, _ := indexService.Shard(0)
-	if doc, err := indexShard.Get(documentId); err != nil {
-		reply(RestResponse{
-			StatusCode: 400,
-			Body: map[string]interface{}{
-				"err": err,
-			},
-		})
-		return
-	} else {
+	clusterState := h.clusterService.State()
+	shardRouting := cluster.GetShards(*clusterState, indexName, documentId).Primary
+	getRequest := getRequest{
+		Index:   indexName,
+		Id:      documentId,
+		ShardId: shardRouting.ShardId,
+	}
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
+		res := getResponseFromBytes(response)
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -215,15 +291,52 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 				"_seq_no":       0,
 				"_primary_term": 1,
 				"found":         true,
-				"_source":       doc,
+				"_source":       res.Fields,
 			},
 		})
-	}
+		//if doc, err := indexShard.Get(documentId); err != nil {
+		//	reply(RestResponse{
+		//		StatusCode: 400,
+		//		Body: map[string]interface{}{
+		//			"err": err,
+		//		},
+		//	})
+		//	return
+		//} else {
+		//	reply(RestResponse{
+		//		StatusCode: 200,
+		//		Body: map[string]interface{}{
+		//			"_index":        indexName,
+		//			"_type":         "_doc",
+		//			"_id":           documentId,
+		//			"_version":      1,
+		//			"_seq_no":       0,
+		//			"_primary_term": 1,
+		//			"found":         true,
+		//			"_source":       doc,
+		//		},
+		//	})
+		//}
+	})
+
 }
 
 type RestDeleteDoc struct {
-	ClusterService *cluster.Service
-	IndicesService *indices.Service
+	clusterService   *cluster.Service
+	indicesService   *indices.Service
+	transportService *transport.Service
+}
+
+func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestDeleteDoc {
+	transportService.RegisterRequestHandler(DeleteAction, func(channel transport.ReplyChannel, req []byte) []byte {
+		return []byte("")
+	})
+
+	return &RestDeleteDoc{
+		clusterService:   clusterService,
+		indicesService:   indicesService,
+		transportService: transportService,
+	}
 }
 
 func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
@@ -231,11 +344,11 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 	documentId := r.PathParams["id"]
 
 	// TODO :: document routing on primary shard with RoutingTable
-	clusterState := h.ClusterService.State()
+	clusterState := h.clusterService.State()
 	index := clusterState.Metadata.Indices[indexName].Index
 	uuid := index.Uuid
 
-	indexService, _ := h.IndicesService.IndexService(uuid)
+	indexService, _ := h.indicesService.IndexService(uuid)
 	//shard := cluster.GetShards(*clusterState, index.Name, documentId).Primary
 	//indexShard, _ := indexService.Shard(shard.ShardId.ShardId)
 	indexShard, _ := indexService.Shard(0)

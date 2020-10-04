@@ -130,20 +130,10 @@ func New(
 		actions.POST: actions.NewRestIndexDoc(clusterService, indicesService, transportService),
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetDoc{
-			ClusterService: clusterService,
-			IndicesService: indicesService,
-		},
-		actions.PUT: &actions.RestIndexDocId{
-			ClusterService:   clusterService,
-			IndicesService:   indicesService,
-			TransportService: transportService,
-		},
-		actions.HEAD: &actions.RestHeadDoc{},
-		actions.DELETE: &actions.RestDeleteDoc{
-			ClusterService: clusterService,
-			IndicesService: indicesService,
-		},
+		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, transportService),
+		actions.PUT:    actions.NewRestIndexDocId(clusterService, indicesService, transportService),
+		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, transportService),
+		actions.HEAD:   &actions.RestHeadDoc{},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
 		actions.GET: &actions.RestSearch{
