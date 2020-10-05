@@ -2,6 +2,7 @@ package actions
 
 import (
 	"encoding/json"
+	"github.com/actumn/searchgoose/index"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/blevesearch/bleve"
@@ -33,58 +34,74 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 	}
 
 	clusterState := h.ClusterService.State()
-	index := clusterState.Metadata.Indices[indexName].Index
-	uuid := index.Uuid
+	idx := clusterState.Metadata.Indices[indexName].Index
+	shardNum := clusterState.Metadata.Indices[indexName].RoutingNumShards
+	uuid := idx.Uuid
 
 	indexService, _ := h.IndicesService.IndexService(uuid)
-	indexShard, _ := indexService.Shard(0)
+
+	var shards []*index.Shard
+	for i := 0; i < shardNum; i++ {
+		indexShard, _ := indexService.Shard(i)
+		shards = append(shards, indexShard)
+	}
 
 	if k, found := qType["match"]; found {
-		query := indexShard.SearchTypeMatch(k)
+		var results []*bleve.SearchResult
+		query := index.SearchTypeMatch(k)
 		searchRequest := bleve.NewSearchRequest(query)
-		searchResults, err := indexShard.Search(searchRequest)
-		if err != nil {
-			reply(RestResponse{
-				StatusCode: 400,
-				Body: map[string]interface{}{
-					"err": err,
-				},
-			})
-			return
+		for _, s := range shards {
+			res, err := s.Search(searchRequest)
+			if err != nil {
+				reply(RestResponse{
+					StatusCode: 400,
+					Body: map[string]interface{}{
+						"err": err,
+					},
+				})
+				return
+			}
+			results = append(results, res)
 		}
 
 		var maxScore float64
 		var docList []interface{}
-		for _, hits := range searchResults.Hits {
-			doc, _ := indexShard.Get(hits.ID)
-			src, _ := flat.Unflatten(doc, nil)
-			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+		for i, s := range shards {
+			for _, hits := range results[i].Hits {
+				doc, _ := s.Get(hits.ID)
+				src, _ := flat.Unflatten(doc, nil)
+				hitJson := map[string]interface{}{
+					"_index":  indexName,
+					"_type":   "_doc",
+					"_id":     hits.ID,
+					"_score":  hits.Score,
+					"_source": src,
+				}
+				if maxScore < hits.Score {
+					maxScore = hits.Score
+				}
+				docList = append(docList, hitJson)
 			}
-			if maxScore < hits.Score {
-				maxScore = hits.Score
-			}
-			docList = append(docList, hitJson)
+		}
+		var took int64
+		for _, r := range results {
+			took += r.Took.Microseconds()
 		}
 
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
-				"took":      searchResults.Took.Microseconds(),
+				"took":      took,
 				"timed_out": false,
 				"_shards": map[string]interface{}{
-					"total":      1,
-					"successful": 1,
+					"total":      shardNum,
+					"successful": shardNum,
 					"skipped":    0,
 					"failed":     0,
 				},
 				"hits": map[string]interface{}{
 					"total": map[string]interface{}{
-						"value":    1,
+						"value":    len(docList),
 						"relation": "eq",
 					},
 					"max_score": maxScore,
@@ -93,51 +110,61 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		})
 	} else if k, found := qType["match_phrase"]; found {
-		query := indexShard.SearchTypeMatchPhrase(k)
+		var results []*bleve.SearchResult
+		query := index.SearchTypeMatchPhrase(k)
 		searchRequest := bleve.NewSearchRequest(query)
-		searchResults, err := indexShard.Search(searchRequest)
-		if err != nil {
-			reply(RestResponse{
-				StatusCode: 400,
-				Body: map[string]interface{}{
-					"err": err,
-				},
-			})
-			return
+		for _, s := range shards {
+			res, err := s.Search(searchRequest)
+			if err != nil {
+				reply(RestResponse{
+					StatusCode: 400,
+					Body: map[string]interface{}{
+						"err": err,
+					},
+				})
+				return
+			}
+			results = append(results, res)
 		}
 
 		var maxScore float64
 		var docList []interface{}
-		for _, hits := range searchResults.Hits {
-			doc, _ := indexShard.Get(hits.ID)
-			src, _ := flat.Unflatten(doc, nil)
-			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+		for i, s := range shards {
+			for _, hits := range results[i].Hits {
+				doc, _ := s.Get(hits.ID)
+				src, _ := flat.Unflatten(doc, nil)
+				hitJson := map[string]interface{}{
+					"_index":  indexName,
+					"_type":   "_doc",
+					"_id":     hits.ID,
+					"_score":  hits.Score,
+					"_source": src,
+				}
+				if maxScore < hits.Score {
+					maxScore = hits.Score
+				}
+				docList = append(docList, hitJson)
 			}
-			if maxScore < hits.Score {
-				maxScore = hits.Score
-			}
-			docList = append(docList, hitJson)
+		}
+		var took int64
+		for _, r := range results {
+			took += r.Took.Microseconds()
 		}
 
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
-				"took":      searchResults.Took.Microseconds(),
+				"took":      took,
 				"timed_out": false,
 				"_shards": map[string]interface{}{
-					"total":      1,
-					"successful": 1,
+					"total":      shardNum,
+					"successful": shardNum,
 					"skipped":    0,
 					"failed":     0,
 				},
 				"hits": map[string]interface{}{
 					"total": map[string]interface{}{
-						"value":    1,
+						"value":    len(docList),
 						"relation": "eq",
 					},
 					"max_score": maxScore,
@@ -146,51 +173,61 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		})
 	} else if _, found := qType["match_all"]; found {
+		var results []*bleve.SearchResult
 		query := bleve.NewMatchAllQuery()
 		searchRequest := bleve.NewSearchRequest(query)
-		searchResults, err := indexShard.Search(searchRequest)
-		if err != nil {
-			reply(RestResponse{
-				StatusCode: 400,
-				Body: map[string]interface{}{
-					"err": err,
-				},
-			})
-			return
+		for _, s := range shards {
+			res, err := s.Search(searchRequest)
+			if err != nil {
+				reply(RestResponse{
+					StatusCode: 400,
+					Body: map[string]interface{}{
+						"err": err,
+					},
+				})
+				return
+			}
+			results = append(results, res)
 		}
 
 		var maxScore float64
 		var docList []interface{}
-		for _, hits := range searchResults.Hits {
-			doc, _ := indexShard.Get(hits.ID)
-			src, _ := flat.Unflatten(doc, nil)
-			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+		for i, s := range shards {
+			for _, hits := range results[i].Hits {
+				doc, _ := s.Get(hits.ID)
+				src, _ := flat.Unflatten(doc, nil)
+				hitJson := map[string]interface{}{
+					"_index":  indexName,
+					"_type":   "_doc",
+					"_id":     hits.ID,
+					"_score":  hits.Score,
+					"_source": src,
+				}
+				if maxScore < hits.Score {
+					maxScore = hits.Score
+				}
+				docList = append(docList, hitJson)
 			}
-			if maxScore < hits.Score {
-				maxScore = hits.Score
-			}
-			docList = append(docList, hitJson)
+		}
+		var took int64
+		for _, r := range results {
+			took += r.Took.Microseconds()
 		}
 
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
-				"took":      searchResults.Took.Microseconds(),
+				"took":      took,
 				"timed_out": false,
 				"_shards": map[string]interface{}{
-					"total":      1,
-					"successful": 1,
+					"total":      shardNum,
+					"successful": shardNum,
 					"skipped":    0,
 					"failed":     0,
 				},
 				"hits": map[string]interface{}{
 					"total": map[string]interface{}{
-						"value":    1,
+						"value":    len(docList),
 						"relation": "eq",
 					},
 					"max_score": maxScore,
@@ -199,51 +236,61 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		})
 	} else if k, found := qType["prefix"]; found {
-		query := indexShard.SearchTypePrefix(k)
+		var results []*bleve.SearchResult
+		query := index.SearchTypePrefix(k)
 		searchRequest := bleve.NewSearchRequest(query)
-		searchResults, err := indexShard.Search(searchRequest)
-		if err != nil {
-			reply(RestResponse{
-				StatusCode: 400,
-				Body: map[string]interface{}{
-					"err": err,
-				},
-			})
-			return
+		for _, s := range shards {
+			res, err := s.Search(searchRequest)
+			if err != nil {
+				reply(RestResponse{
+					StatusCode: 400,
+					Body: map[string]interface{}{
+						"err": err,
+					},
+				})
+				return
+			}
+			results = append(results, res)
 		}
 
 		var maxScore float64
 		var docList []interface{}
-		for _, hits := range searchResults.Hits {
-			doc, _ := indexShard.Get(hits.ID)
-			src, _ := flat.Unflatten(doc, nil)
-			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+		for i, s := range shards {
+			for _, hits := range results[i].Hits {
+				doc, _ := s.Get(hits.ID)
+				src, _ := flat.Unflatten(doc, nil)
+				hitJson := map[string]interface{}{
+					"_index":  indexName,
+					"_type":   "_doc",
+					"_id":     hits.ID,
+					"_score":  hits.Score,
+					"_source": src,
+				}
+				if maxScore < hits.Score {
+					maxScore = hits.Score
+				}
+				docList = append(docList, hitJson)
 			}
-			if maxScore < hits.Score {
-				maxScore = hits.Score
-			}
-			docList = append(docList, hitJson)
+		}
+		var took int64
+		for _, r := range results {
+			took += r.Took.Microseconds()
 		}
 
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
-				"took":      searchResults.Took.Microseconds(),
+				"took":      took,
 				"timed_out": false,
 				"_shards": map[string]interface{}{
-					"total":      1,
-					"successful": 1,
+					"total":      shardNum,
+					"successful": shardNum,
 					"skipped":    0,
 					"failed":     0,
 				},
 				"hits": map[string]interface{}{
 					"total": map[string]interface{}{
-						"value":    1,
+						"value":    len(docList),
 						"relation": "eq",
 					},
 					"max_score": maxScore,
@@ -252,51 +299,61 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		})
 	} else if k, found := qType["fuzzy"]; found {
-		query := indexShard.SearchTypeFuzzy(k)
+		var results []*bleve.SearchResult
+		query := index.SearchTypeFuzzy(k)
 		searchRequest := bleve.NewSearchRequest(query)
-		searchResults, err := indexShard.Search(searchRequest)
-		if err != nil {
-			reply(RestResponse{
-				StatusCode: 400,
-				Body: map[string]interface{}{
-					"err": err,
-				},
-			})
-			return
+		for _, s := range shards {
+			res, err := s.Search(searchRequest)
+			if err != nil {
+				reply(RestResponse{
+					StatusCode: 400,
+					Body: map[string]interface{}{
+						"err": err,
+					},
+				})
+				return
+			}
+			results = append(results, res)
 		}
 
 		var maxScore float64
 		var docList []interface{}
-		for _, hits := range searchResults.Hits {
-			doc, _ := indexShard.Get(hits.ID)
-			src, _ := flat.Unflatten(doc, nil)
-			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+		for i, s := range shards {
+			for _, hits := range results[i].Hits {
+				doc, _ := s.Get(hits.ID)
+				src, _ := flat.Unflatten(doc, nil)
+				hitJson := map[string]interface{}{
+					"_index":  indexName,
+					"_type":   "_doc",
+					"_id":     hits.ID,
+					"_score":  hits.Score,
+					"_source": src,
+				}
+				if maxScore < hits.Score {
+					maxScore = hits.Score
+				}
+				docList = append(docList, hitJson)
 			}
-			if maxScore < hits.Score {
-				maxScore = hits.Score
-			}
-			docList = append(docList, hitJson)
+		}
+		var took int64
+		for _, r := range results {
+			took += r.Took.Microseconds()
 		}
 
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
-				"took":      searchResults.Took.Microseconds(),
+				"took":      took,
 				"timed_out": false,
 				"_shards": map[string]interface{}{
-					"total":      1,
-					"successful": 1,
+					"total":      shardNum,
+					"successful": shardNum,
 					"skipped":    0,
 					"failed":     0,
 				},
 				"hits": map[string]interface{}{
 					"total": map[string]interface{}{
-						"value":    1,
+						"value":    len(docList),
 						"relation": "eq",
 					},
 					"max_score": maxScore,
@@ -305,51 +362,61 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		})
 	} else if k, found := qType["bool"]; found {
-		query := indexShard.SearchTypeBool(k)
+		var results []*bleve.SearchResult
+		query := index.SearchTypeBool(k)
 		searchRequest := bleve.NewSearchRequest(query)
-		searchResults, err := indexShard.Search(searchRequest)
-		if err != nil {
-			reply(RestResponse{
-				StatusCode: 400,
-				Body: map[string]interface{}{
-					"err": err,
-				},
-			})
-			return
+		for _, s := range shards {
+			res, err := s.Search(searchRequest)
+			if err != nil {
+				reply(RestResponse{
+					StatusCode: 400,
+					Body: map[string]interface{}{
+						"err": err,
+					},
+				})
+				return
+			}
+			results = append(results, res)
 		}
 
 		var maxScore float64
 		var docList []interface{}
-		for _, hits := range searchResults.Hits {
-			doc, _ := indexShard.Get(hits.ID)
-			src, _ := flat.Unflatten(doc, nil)
-			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+		for i, s := range shards {
+			for _, hits := range results[i].Hits {
+				doc, _ := s.Get(hits.ID)
+				src, _ := flat.Unflatten(doc, nil)
+				hitJson := map[string]interface{}{
+					"_index":  indexName,
+					"_type":   "_doc",
+					"_id":     hits.ID,
+					"_score":  hits.Score,
+					"_source": src,
+				}
+				if maxScore < hits.Score {
+					maxScore = hits.Score
+				}
+				docList = append(docList, hitJson)
 			}
-			if maxScore < hits.Score {
-				maxScore = hits.Score
-			}
-			docList = append(docList, hitJson)
+		}
+		var took int64
+		for _, r := range results {
+			took += r.Took.Microseconds()
 		}
 
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
-				"took":      searchResults.Took.Microseconds(),
+				"took":      took,
 				"timed_out": false,
 				"_shards": map[string]interface{}{
-					"total":      1,
-					"successful": 1,
+					"total":      shardNum,
+					"successful": shardNum,
 					"skipped":    0,
 					"failed":     0,
 				},
 				"hits": map[string]interface{}{
 					"total": map[string]interface{}{
-						"value":    1,
+						"value":    len(docList),
 						"relation": "eq",
 					},
 					"max_score": maxScore,
@@ -358,51 +425,61 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		})
 	} else if k, found := qType["range"]; found {
-		query := indexShard.SearchTypeNumericRange(k)
+		var results []*bleve.SearchResult
+		query := index.SearchTypeNumericRange(k)
 		searchRequest := bleve.NewSearchRequest(query)
-		searchResults, err := indexShard.Search(searchRequest)
-		if err != nil {
-			reply(RestResponse{
-				StatusCode: 400,
-				Body: map[string]interface{}{
-					"err": err,
-				},
-			})
-			return
+		for _, s := range shards {
+			res, err := s.Search(searchRequest)
+			if err != nil {
+				reply(RestResponse{
+					StatusCode: 400,
+					Body: map[string]interface{}{
+						"err": err,
+					},
+				})
+				return
+			}
+			results = append(results, res)
 		}
 
 		var maxScore float64
 		var docList []interface{}
-		for _, hits := range searchResults.Hits {
-			doc, _ := indexShard.Get(hits.ID)
-			src, _ := flat.Unflatten(doc, nil)
-			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+		for i, s := range shards {
+			for _, hits := range results[i].Hits {
+				doc, _ := s.Get(hits.ID)
+				src, _ := flat.Unflatten(doc, nil)
+				hitJson := map[string]interface{}{
+					"_index":  indexName,
+					"_type":   "_doc",
+					"_id":     hits.ID,
+					"_score":  hits.Score,
+					"_source": src,
+				}
+				if maxScore < hits.Score {
+					maxScore = hits.Score
+				}
+				docList = append(docList, hitJson)
 			}
-			if maxScore < hits.Score {
-				maxScore = hits.Score
-			}
-			docList = append(docList, hitJson)
+		}
+		var took int64
+		for _, r := range results {
+			took += r.Took.Microseconds()
 		}
 
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
-				"took":      searchResults.Took.Microseconds(),
+				"took":      took,
 				"timed_out": false,
 				"_shards": map[string]interface{}{
-					"total":      1,
-					"successful": 1,
+					"total":      shardNum,
+					"successful": shardNum,
 					"skipped":    0,
 					"failed":     0,
 				},
 				"hits": map[string]interface{}{
 					"total": map[string]interface{}{
-						"value":    1,
+						"value":    len(docList),
 						"relation": "eq",
 					},
 					"max_score": maxScore,
