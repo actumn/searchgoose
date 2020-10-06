@@ -2,8 +2,33 @@ package actions
 
 import (
 	"fmt"
+	"github.com/actumn/searchgoose/state"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
+func TestIndexRequest_ToBytes(t *testing.T) {
+	// Arrange
+	req := indexRequest{
+		Index:  "index",
+		Id:     "test-id",
+		Source: []byte("asdfmasklfmklsmfkl"),
+		ShardId: state.ShardId{
+			Index: state.Index{
+				Name: "index",
+				Uuid: "jujsyy234lds,",
+			},
+			ShardId: 1,
+		},
+	}
+
+	// Action
+	bytes := req.toBytes()
+	parsed := indexRequestFromBytes(bytes)
+
+	// Assert
+	assert.Equal(t, req.Source, parsed.Source)
+}
 
 func TestRestGetDoc_Handle(t *testing.T) {
 	// Arrange

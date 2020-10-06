@@ -14,8 +14,40 @@ func TestService_UpdateMapping(t *testing.T) {
 				Type: "_doc",
 				Source: []byte(`{
 				"properties": {
-					"field1": {
+					"text_field": {
 						"type": "text"
+					},
+					"integer_field": {
+						"type": "integer"
+					},
+					"float_field": {
+						"type": "float"
+					},
+					"date_field": {
+						"type": "date"
+					},
+					"boolean_field": {
+						"type": "boolean"
+					},
+					"geo_point_field": {
+						"type": "geo_point"
+					},
+					"object_field": {
+						"properties": {
+							"age": {
+								"type": "integer"
+							},
+							"name": {
+								"properties": {
+									"first": {
+										"type": "text"
+									},
+									"last": {
+										"type": "text"
+									}
+								}
+							}
+						}
 					}
 				}
 			}`),

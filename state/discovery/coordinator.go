@@ -39,7 +39,7 @@ func NewCoordinator(transportService *transport.Service, clusterApplierService *
 		PersistedState:        persistedState,
 	}
 
-	// c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
+	c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
 
 	return c
 }
@@ -50,7 +50,7 @@ func (c *Coordinator) Start() {
 		PersistedState: c.PersistedState,
 	}
 
-	//c.ApplierState = c.PersistedState.GetLastAcceptedState()
+	c.ApplierState = c.PersistedState.GetLastAcceptedState()
 	//c.ApplierState = &state.ClusterState{
 	//	Name: "searchgoose-testClusters",
 	//	Nodes: &state.Nodes{
@@ -92,7 +92,7 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	log.Println("publish ended successfully")
 }
 
-func (c *Coordinator) HandlePublish(req []byte) []byte {
+func (c *Coordinator) HandlePublish(channel transport.ReplyChannel, req []byte) []byte {
 	// handle publish
 	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.LocalNode)
 	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()

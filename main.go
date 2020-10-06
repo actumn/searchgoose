@@ -54,10 +54,10 @@ func start() {
 
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
-	//coordinator.Start()
+	coordinator.Start()
 	//coordinator.StartInitialJoin()
 
-	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService)
+	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService)
 	log.Println("start server...")
 	if err := b.Start(); err != nil {
 		panic(err)

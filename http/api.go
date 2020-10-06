@@ -6,6 +6,7 @@ import (
 	"github.com/actumn/searchgoose/http/actions"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
+	"github.com/actumn/searchgoose/state/transport"
 	"github.com/valyala/fasthttp"
 	"log"
 )
@@ -96,6 +97,7 @@ func New(
 	clusterService *cluster.Service,
 	clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService,
 	indicesService *indices.Service,
+	transportService *transport.Service,
 ) *Bootstrap {
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
@@ -125,25 +127,13 @@ func New(
 		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
-		actions.POST: &actions.RestIndexDoc{
-			ClusterService: clusterService,
-			IndicesService: indicesService,
-		},
+		actions.POST: actions.NewRestIndexDoc(clusterService, indicesService, transportService),
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetDoc{
-			ClusterService: clusterService,
-			IndicesService: indicesService,
-		},
-		actions.PUT: &actions.RestIndexDocId{
-			ClusterService: clusterService,
-			IndicesService: indicesService,
-		},
-		actions.HEAD: &actions.RestHeadDoc{},
-		actions.DELETE: &actions.RestDeleteDoc{
-			ClusterService: clusterService,
-			IndicesService: indicesService,
-		},
+		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, transportService),
+		actions.PUT:    actions.NewRestIndexDocId(clusterService, indicesService, transportService),
+		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, transportService),
+		actions.HEAD:   &actions.RestHeadDoc{},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
 		actions.GET: &actions.RestSearch{

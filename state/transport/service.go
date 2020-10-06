@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"github.com/actumn/searchgoose/state"
 	"log"
-	"net"
 	"time"
 )
 
@@ -20,7 +19,11 @@ const (
 
 // interfaces
 type Connection interface {
-	SendRequest(req []byte, callback func(byte []byte))
+	SendRequest(action string, req []byte, callback func(byte []byte))
+}
+
+type ReplyChannel interface {
+	SendMessage(b []byte) (n int, err error)
 }
 
 type Transport interface {
@@ -29,10 +32,11 @@ type Transport interface {
 	Register(action string, handler RequestHandler)
 	GetLocalAddress() string
 	GetSeedHosts() []string
+	GetHandler(action string) RequestHandler
 }
 
 // structures
-type RequestHandler func(conn net.Conn, req []byte) []byte
+type RequestHandler func(channel ReplyChannel, req []byte) []byte
 
 type Service struct {
 	LocalNode *state.Node
@@ -48,7 +52,7 @@ func NewService(id string, transport Transport) *Service {
 		ConnectionManager: make(map[state.Node]Connection),
 		Transport:         transport,
 	}
-	service.RegisterRequestHandler(HANDSHAKE_REQ, service.handleHandShake)
+	service.RegisterRequestHandler(HANDSHAKE_REQ, service.handleHandshake)
 	service.RegisterRequestHandler(PEERFIND_REQ, service.HandlePeersRequest)
 	return service
 }
@@ -61,15 +65,19 @@ func (s *Service) Start() {
 }
 
 func (s *Service) SendRequestConn(conn Connection, action string, req []byte, callback func(response []byte)) {
-	//// local node
-	// handler := s.Transport.RequestHandlers[action]
-	// handler(req)
-
-	conn.SendRequest(req, callback)
+	conn.SendRequest(action, req, callback)
 }
 
 func (s *Service) SendRequest(node state.Node, action string, req []byte, callback func(response []byte)) {
-	conn := s.ConnectionManager[node]
+	var conn Connection
+	if node.Id == s.LocalNode.Id {
+		conn = &LocalConnection{
+			service: s,
+		}
+	} else {
+		conn = s.ConnectionManager[node]
+	}
+
 	s.SendRequestConn(conn, action, req, callback)
 }
 
@@ -78,19 +86,18 @@ func (s *Service) RegisterRequestHandler(action string, handler RequestHandler) 
 }
 
 func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node state.Node)) {
-
 	nowNode := s.LocalNode
 	connectedNode := state.Node{}
 
 	s.Transport.OpenConnection(address, func(conn Connection) {
-		handShakeData := DataFormat{
+		handshakeData := DataFormat{
 			Source:  nowNode.HostAddress,
 			Dest:    address,
 			Action:  HANDSHAKE_REQ,
 			Content: nowNode.ToBytes(),
 		}
 		log.Printf("Send handshake REQ to %s\n", address)
-		request := handShakeData.ToBytes()
+		request := handshakeData.ToBytes()
 		s.SendRequestConn(conn, HANDSHAKE_REQ, request, func(response []byte) {
 			node := state.NodeFromBytes(response)
 			connectedNode = *node
@@ -105,18 +112,18 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 
 }
 
-func (s *Service) handleHandShake(conn net.Conn, req []byte) []byte {
+func (s *Service) handleHandshake(channel ReplyChannel, req []byte) []byte {
 	reqNode := state.NodeFromBytes(req)
 	log.Printf("Receive handshake REQ from %s\n", reqNode.HostAddress)
 
 	nowNode := s.LocalNode
-	handShakeData := DataFormat{
+	handshakeData := DataFormat{
 		Source:  nowNode.HostAddress,
 		Action:  HANDSHAKE_ACK,
 		Content: nowNode.ToBytes(),
 	}
 
-	return handShakeData.ToBytes()
+	return handshakeData.ToBytes()
 }
 
 func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state.Node {
@@ -149,7 +156,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 	return peers
 }
 
-func (s *Service) HandlePeersRequest(conn net.Conn, req []byte) []byte {
+func (s *Service) HandlePeersRequest(channel ReplyChannel, req []byte) []byte {
 	request := PeersRequestFromBytes(req)
 	log.Printf("Receive Peer Finding REQ from %s\n", request.SourceNode.Id)
 
@@ -163,13 +170,13 @@ func (s *Service) HandlePeersRequest(conn net.Conn, req []byte) []byte {
 		KnownPeers: knownPeers,
 	}
 
-	handShakeData := DataFormat{
+	handshakeData := DataFormat{
 		Source:  nowNode.HostAddress,
 		Action:  PEERFIND_ACK,
 		Content: response.ToBytes(),
 	}
 
-	return handShakeData.ToBytes()
+	return handshakeData.ToBytes()
 }
 
 // Data types
@@ -247,12 +254,25 @@ func PeersResponseFromBytes(b []byte) *PeersResponse {
 	return &data
 }
 
-/*
 type LocalConnection struct {
+	service *Service
 }
-func (c *LocalConnection) GetNode() {
+
+func (c *LocalConnection) SendRequest(action string, req []byte, callback func(byte []byte)) {
+	handler := c.service.Transport.GetHandler(action)
+	replyChannel := &DirectReplyChannel{
+		callback: callback,
+	}
+
+	data := handler(replyChannel, req)
+	replyChannel.SendMessage(data)
 }
-func (c *LocalConnection) SendRequest(req []byte) {
-	//handler.sdfsadfsadfsadf
+
+type DirectReplyChannel struct {
+	callback func(byte []byte)
 }
-*/
+
+func (c *DirectReplyChannel) SendMessage(b []byte) (int, error) {
+	c.callback(b)
+	return 0, nil
+}
