@@ -19,40 +19,37 @@ func SearchTypeMatch(searchType interface{}) *query.MatchQuery {
 	return bleve.NewMatchQuery(queryString)
 }
 
-func SearchTypeMatchPhrase(searchType interface{}) *query.MatchPhraseQuery {
+func SearchTypeMatchPhrase(searchType interface{}) *query.PhraseQuery {
 	m := searchType.(map[string]interface{})
 	var field, message string
 	for key, value := range m {
 		field = key
 		message = value.(string)
 	}
-	queryString := field + ":\"" + message + "\""
 
-	return bleve.NewMatchPhraseQuery(queryString)
+	return bleve.NewPhraseQuery(strings.Fields(strings.ToLower(message)), field)
 }
 
 func SearchTypePrefix(searchType interface{}) *query.PrefixQuery {
 	m := searchType.(map[string]interface{})
-	var field, message string
+	var _, message string
 	for key, value := range m {
-		field = key
+		_ = key
 		message = value.(string)
 	}
-	queryString := field + ":\"" + message + "\""
 
-	return bleve.NewPrefixQuery(strings.ToLower(queryString))
+	return bleve.NewPrefixQuery(strings.ToLower(message))
 }
 
 func SearchTypeFuzzy(searchType interface{}) *query.FuzzyQuery {
 	m := searchType.(map[string]interface{})
-	var field, message string
+	var _, message string
 	for key, value := range m {
-		field = key
+		_ = key
 		message = value.(string)
 	}
-	queryString := field + ":\"" + message + "\""
 
-	return bleve.NewFuzzyQuery(strings.ToLower(queryString))
+	return bleve.NewFuzzyQuery(strings.ToLower(message))
 }
 
 func SearchTypeNumericRange(searchType interface{}) *query.ConjunctionQuery {
