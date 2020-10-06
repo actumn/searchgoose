@@ -57,7 +57,9 @@ func start() {
 	coordinator.Start()
 	//coordinator.StartInitialJoin()
 
-	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService)
+	indexNameExpressionResolver := indices.NewNameExpressionResolver()
+
+	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService, indexNameExpressionResolver)
 	log.Println("start server...")
 	if err := b.Start(); err != nil {
 		panic(err)

@@ -98,6 +98,7 @@ func New(
 	clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService,
 	indicesService *indices.Service,
 	transportService *transport.Service,
+	indexNameExpressionResolver *indices.NameExpressionResolver,
 ) *Bootstrap {
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
@@ -119,11 +120,9 @@ func New(
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/{index}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetIndex{},
-		actions.PUT: &actions.RestPutIndex{
-			CreateIndexService: clusterMetadataCreateIndexService,
-		},
-		actions.DELETE: &actions.RestDeleteIndex{},
+		actions.GET:    actions.NewRestGetIndex(clusterService, indexNameExpressionResolver),
+		actions.PUT:    actions.NewRestPutIndex(clusterMetadataCreateIndexService),
+		actions.DELETE: actions.NewRestDeleteIndex(),
 		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{

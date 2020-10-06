@@ -7,6 +7,14 @@ import (
 
 type NameExpressionResolver struct{}
 
+func NewNameExpressionResolver() *NameExpressionResolver {
+	return &NameExpressionResolver{}
+}
+
+//func (r *NameExpressionResolver) jsConcreteIndicesNames(clusterState state.ClusterState, expressions ...string) []string {
+//
+//}
+
 func (r *NameExpressionResolver) ConcreteIndexNames(clusterState state.ClusterState, expression string) []string {
 	var indexResult []string
 	indiceResult := r.ConcreteIndices(clusterState, expression)

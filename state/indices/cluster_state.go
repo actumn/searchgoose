@@ -31,8 +31,10 @@ func (s *ClusterStateService) ApplyClusterState(event state.ClusterChangedEvent)
 			log.Printf("Create new index shard - index uuid: %s, shard number: %d\n", index.Uuid, shardRouting.ShardId.ShardId)
 			indexService.CreateShard(shardRouting.ShardId.ShardId)
 		} else {
-			log.Printf("Create new index shard - index uuid: %s, shard number: %d\n", index.Uuid, shardRouting.ShardId.ShardId)
-			indexService.CreateShard(shardRouting.ShardId.ShardId)
+			if _, exists := indexService.Shard(shardRouting.ShardId.ShardId); !exists {
+				log.Printf("Create existing index shard - index uuid: %s, shard number: %d\n", index.Uuid, shardRouting.ShardId.ShardId)
+				indexService.CreateShard(shardRouting.ShardId.ShardId)
+			}
 		}
 	}
 }
