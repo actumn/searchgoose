@@ -45,6 +45,7 @@ func indexRequestFromBytes(b []byte) *indexRequest {
 }
 
 type indexResponse struct {
+	Err error
 }
 
 type RestIndexDoc struct {
@@ -215,6 +216,7 @@ type getResponse struct {
 	Id      string
 	ShardId state.ShardId
 	Fields  map[string]interface{}
+	Err     error
 }
 
 func (r *getResponse) toBytes() []byte {
@@ -250,15 +252,20 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
 		indexShard, _ := indexService.Shard(request.ShardId.ShardId)
 
-		doc, _ := indexShard.Get(request.Id)
-		res := getResponse{
-			Index:   request.Index,
-			Id:      request.Id,
-			ShardId: request.ShardId,
-			Fields:  doc,
+		if doc, err := indexShard.Get(request.Id); err != nil {
+			res := getResponse{
+				Err: err,
+			}
+			return res.toBytes()
+		} else {
+			res := getResponse{
+				Index:   request.Index,
+				Id:      request.Id,
+				ShardId: request.ShardId,
+				Fields:  doc,
+			}
+			return res.toBytes()
 		}
-
-		return res.toBytes()
 	})
 
 	return &RestGetDoc{
@@ -281,42 +288,28 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 	}
 	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
 		res := getResponseFromBytes(response)
-		reply(RestResponse{
-			StatusCode: 200,
-			Body: map[string]interface{}{
-				"_index":        indexName,
-				"_type":         "_doc",
-				"_id":           documentId,
-				"_version":      1,
-				"_seq_no":       0,
-				"_primary_term": 1,
-				"found":         true,
-				"_source":       res.Fields,
-			},
-		})
-		//if doc, err := indexShard.Get(documentId); err != nil {
-		//	reply(RestResponse{
-		//		StatusCode: 400,
-		//		Body: map[string]interface{}{
-		//			"err": err,
-		//		},
-		//	})
-		//	return
-		//} else {
-		//	reply(RestResponse{
-		//		StatusCode: 200,
-		//		Body: map[string]interface{}{
-		//			"_index":        indexName,
-		//			"_type":         "_doc",
-		//			"_id":           documentId,
-		//			"_version":      1,
-		//			"_seq_no":       0,
-		//			"_primary_term": 1,
-		//			"found":         true,
-		//			"_source":       doc,
-		//		},
-		//	})
-		//}
+		if res.Err != nil {
+			reply(RestResponse{
+				StatusCode: 400,
+				Body: map[string]interface{}{
+					"err": res.Err,
+				},
+			})
+		} else {
+			reply(RestResponse{
+				StatusCode: 200,
+				Body: map[string]interface{}{
+					"_index":        indexName,
+					"_type":         "_doc",
+					"_id":           documentId,
+					"_version":      1,
+					"_seq_no":       0,
+					"_primary_term": 1,
+					"found":         true,
+					"_source":       res.Fields,
+				},
+			})
+		}
 	})
 
 }
@@ -347,6 +340,7 @@ func deleteRequestFromBytes(b []byte) *deleteRequest {
 }
 
 type deleteResponse struct {
+	Err error
 }
 
 type RestDeleteDoc struct {
