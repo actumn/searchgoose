@@ -2,8 +2,8 @@ package tcp
 
 import (
 	"github.com/actumn/searchgoose/state/transport"
+	"github.com/sirupsen/logrus"
 	"io"
-	"log"
 	"net"
 )
 
@@ -25,8 +25,8 @@ func (c *Connection) SendRequest(action string, req []byte, callback func(byte [
 		recvBuf := make([]byte, 4096)
 		n, err := c.conn.Read(recvBuf)
 		if err != nil {
-			// log.Fatalf("Fail to get response from %s; err: %v", address, err)
-			log.Fatalf("Fail to get response; err: %v", err)
+			// logrus.Fatalf("Fail to get response from %s; err: %v", address, err)
+			logrus.Fatalf("Fail to get response; err: %v", err)
 			return
 		}
 
@@ -61,15 +61,15 @@ func (t *Transport) Start(address string) {
 		l, err := net.Listen("tcp", address)
 		// l, err := net.Listen("tcp", ":8180")
 		if err != nil {
-			log.Fatalf("Fail to bind address to %s; err: %v", address, err)
+			logrus.Fatalf("Fail to bind address to %s; err: %v", address, err)
 		}
-		log.Printf("Success of listening on %s\n", address)
+		logrus.Info("Success of listening on %s", address)
 		defer l.Close()
 
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				log.Printf("Fail to accept; err: %v", err)
+				logrus.Info("Fail to accept; err: %v", err)
 				continue
 			}
 			// Connection Handler
@@ -78,10 +78,10 @@ func (t *Transport) Start(address string) {
 				n, err := conn.Read(recvBuf)
 				if err != nil {
 					if io.EOF == err {
-						log.Printf("connection is closed from client; %v", conn.RemoteAddr().String())
+						logrus.Info("connection is closed from client; %v", conn.RemoteAddr().String())
 						return
 					}
-					log.Printf("Fail to receive data; err: %v", err)
+					logrus.Info("Fail to receive data; err: %v", err)
 					return
 				}
 				if 0 < n {
@@ -104,9 +104,9 @@ func (t *Transport) Start(address string) {
 func (t *Transport) OpenConnection(address string, callback func(conn transport.Connection)) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		log.Fatalf("Failed to connect to %s : %v", address, err)
+		logrus.Fatalf("Failed to connect to %s : %v", address, err)
 	}
-	log.Printf("Success on connecting %s\n", address)
+	logrus.Info("Success on connecting %s", address)
 
 	callback(&Connection{
 		conn: conn,

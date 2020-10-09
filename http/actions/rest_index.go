@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
-	"log"
+	"github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
 )
@@ -60,7 +60,7 @@ func (h *RestGetIndex) Handle(r *RestRequest, reply ResponseListener) {
 		index := clusterState.Metadata.Indices[indexName]
 		var mappings map[string]interface{}
 		if err := json.Unmarshal(index.Mapping["_doc"].Source, &mappings); err != nil {
-			log.Fatalln(err)
+			logrus.Fatal(err)
 		}
 
 		response[indexName] = map[string]interface{}{

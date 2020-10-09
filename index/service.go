@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/actumn/searchgoose/state"
 	"github.com/blevesearch/bleve/mapping"
-	"log"
+	"github.com/sirupsen/logrus"
 	"strconv"
 )
 
@@ -29,7 +29,7 @@ func (s *Service) UpdateMapping(metadata state.IndexMetadata) {
 
 	var indexMapping map[string]interface{}
 	if err := json.Unmarshal(mappingMetadata.Source, &indexMapping); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 
 	// TODO :: implements more mapping types (numeric, geo, datetime, boolean, sub-document, ...)

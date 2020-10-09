@@ -9,16 +9,23 @@ import (
 	"github.com/actumn/searchgoose/state/persist"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/actumn/searchgoose/state/transport/tcp"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	start()
 }
 
+func init() {
+	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+}
+
 func start() {
 	nodeId := cluster.GenerateNodeId()
-	log.Printf("[Node Id] : %s\n", nodeId)
+	logrus.Info("[Node Id]: %s", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
 	address := "localhost:8179"
@@ -60,7 +67,7 @@ func start() {
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService, indexNameExpressionResolver)
-	log.Println("start server...")
+	logrus.Info("start server...")
 	if err := b.Start(); err != nil {
 		panic(err)
 	}

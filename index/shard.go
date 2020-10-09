@@ -6,7 +6,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index/scorch"
 	"github.com/blevesearch/bleve/mapping"
-	"log"
+	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -20,7 +20,7 @@ func NewShard(shardPath string, mapping mapping.IndexMapping) *Shard {
 		"error_if_exists":   false,
 	})
 	if err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 
 	return &Shard{

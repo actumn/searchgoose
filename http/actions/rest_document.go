@@ -9,7 +9,7 @@ import (
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/actumn/searchgoose/state/transport"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -29,7 +29,7 @@ func (r *indexRequest) toBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -39,7 +39,7 @@ func indexRequestFromBytes(b []byte) *indexRequest {
 	decoder := gob.NewDecoder(buffer)
 	var req indexRequest
 	if err := decoder.Decode(&req); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &req
 }
@@ -57,7 +57,7 @@ type RestIndexDoc struct {
 func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDoc {
 	// Handle primary shard request
 	transportService.RegisterRequestHandler(IndexAction, func(channel transport.ReplyChannel, req []byte) []byte {
-		log.Println("indexAction on primary shard")
+		logrus.Info("indexAction on primary shard")
 		request := indexRequestFromBytes(req)
 
 		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
@@ -66,11 +66,11 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 		var body map[string]interface{}
 		// TODO :: json error handling
 		if err := json.Unmarshal(request.Source, &body); err != nil {
-			log.Fatalln(err)
+			logrus.Fatal(err)
 		}
 		// TODO :: how to handle error on distributed system?
 		if err := indexShard.Index(request.Id, body); err != nil {
-			log.Fatalln(err)
+			logrus.Fatal(err)
 		}
 		return []byte("success")
 	})
@@ -87,6 +87,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 	documentId := common.RandomBase64()
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
+		logrus.Error(err)
 		reply(RestResponse{
 			StatusCode: 400,
 			Body: map[string]interface{}{
@@ -106,7 +107,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		ShardId: shardRouting.ShardId,
 	}
 	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
-		log.Println("callback success")
+		logrus.Info("callback success")
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -147,6 +148,7 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 	documentId := r.PathParams["id"]
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
+		logrus.Error(err)
 		reply(RestResponse{
 			StatusCode: 400,
 			Body: map[string]interface{}{
@@ -196,7 +198,7 @@ func (r *getRequest) toBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -206,7 +208,7 @@ func getRequestFromBytes(b []byte) *getRequest {
 	decoder := gob.NewDecoder(buffer)
 	var req getRequest
 	if err := decoder.Decode(&req); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &req
 }
@@ -223,7 +225,7 @@ func (r *getResponse) toBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -233,7 +235,7 @@ func getResponseFromBytes(b []byte) *getResponse {
 	decoder := gob.NewDecoder(buffer)
 	var res getResponse
 	if err := decoder.Decode(&res); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &res
 }
@@ -246,13 +248,14 @@ type RestGetDoc struct {
 
 func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestGetDoc {
 	transportService.RegisterRequestHandler(GetAction, func(channel transport.ReplyChannel, req []byte) []byte {
-		log.Println("getAction on shard")
+		logrus.Info("getAction on shard")
 		request := getRequestFromBytes(req)
 
 		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
 		indexShard, _ := indexService.Shard(request.ShardId.ShardId)
 
 		if doc, err := indexShard.Get(request.Id); err != nil {
+			logrus.Warn(err)
 			res := getResponse{
 				Err: err,
 			}
@@ -324,7 +327,7 @@ func (r *deleteRequest) toBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -334,7 +337,7 @@ func deleteRequestFromBytes(b []byte) *deleteRequest {
 	decoder := gob.NewDecoder(buffer)
 	var req deleteRequest
 	if err := decoder.Decode(&req); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &req
 }
@@ -351,7 +354,7 @@ type RestDeleteDoc struct {
 
 func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestDeleteDoc {
 	transportService.RegisterRequestHandler(DeleteAction, func(channel transport.ReplyChannel, req []byte) []byte {
-		log.Println("deleteAction on primary shard")
+		logrus.Info("deleteAction on primary shard")
 		request := deleteRequestFromBytes(req)
 
 		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
@@ -359,7 +362,7 @@ func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.S
 
 		// TODO :: how to handle error on distributed system?
 		if err := indexShard.Delete(request.Id); err != nil {
-			log.Fatalln(err)
+			logrus.Fatal(err)
 		}
 
 		return []byte("success")

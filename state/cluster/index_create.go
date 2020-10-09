@@ -3,7 +3,7 @@ package cluster
 import (
 	"github.com/actumn/searchgoose/common"
 	"github.com/actumn/searchgoose/state"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 type CreateIndexClusterStateUpdateRequest struct {
@@ -25,7 +25,7 @@ func NewMetadataCreateIndexService(clusterService state.ClusterService, allocati
 }
 
 func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpdateRequest) {
-	log.Printf("Create index - index name: %s, mapping: %s\n", req.Index, string(req.Mappings))
+	logrus.Info("Create index - index name: %s, mapping: %s", req.Index, string(req.Mappings))
 
 	s.ClusterService.SubmitStateUpdateTask(func(current state.ClusterState) state.ClusterState {
 		return s.applyCreateIndex(current, req)

@@ -3,7 +3,7 @@ package state
 import (
 	"bytes"
 	"encoding/gob"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 // ClusterState
@@ -21,7 +21,7 @@ func (c *ClusterState) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(c); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -30,7 +30,7 @@ func ClusterStateFromBytes(b []byte, localNode *Node) *ClusterState {
 	decoder := gob.NewDecoder(buffer)
 	var state ClusterState
 	if err := decoder.Decode(&state); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 
 	state.Nodes.LocalNodeId = localNode.Id

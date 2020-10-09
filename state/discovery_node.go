@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
+	"github.com/sirupsen/logrus"
 	"math/rand"
 )
 
@@ -33,7 +33,7 @@ func (n *Node) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(n); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -43,7 +43,7 @@ func NodeFromBytes(b []byte) *Node {
 	decoder := gob.NewDecoder(buffer)
 	var node Node
 	if err := decoder.Decode(&node); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &node
 }
