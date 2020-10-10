@@ -122,10 +122,11 @@ func (h *RestPutIndex) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 
-	h.CreateIndexService.CreateIndex(struct {
-		Index    string
-		Mappings []byte
-	}{Index: index, Mappings: mapping})
+	h.CreateIndexService.CreateIndex(cluster.CreateIndexClusterStateUpdateRequest{
+		Index:    index,
+		Mappings: mapping,
+		Settings: body["settings"].(map[string]interface{}),
+	})
 
 	reply(RestResponse{
 		StatusCode: 200,

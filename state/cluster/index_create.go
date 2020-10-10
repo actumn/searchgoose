@@ -9,7 +9,7 @@ import (
 type CreateIndexClusterStateUpdateRequest struct {
 	Index    string
 	Mappings []byte
-	//Settings Settings
+	Settings map[string]interface{}
 }
 
 type MetadataCreateIndexService struct {
@@ -33,13 +33,17 @@ func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpda
 }
 
 func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState, req CreateIndexClusterStateUpdateRequest) state.ClusterState {
+	// prepare Settings
+	settings := req.Settings
+	routingNumShards := int(settings["number_of_shards"].(float64))
+
 	// prepare indexMetadata
 	indexMetadata := state.IndexMetadata{
 		Index: state.Index{
 			Name: req.Index,
 			Uuid: common.RandomBase64(),
 		},
-		RoutingNumShards: 3, // TODO :: get RoutingNumShards from req
+		RoutingNumShards: routingNumShards,
 		Mapping: map[string]state.MappingMetadata{
 			"_doc": {
 				Type:   "_doc",
@@ -98,6 +102,3 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 		RoutingTable: routingTable,
 	})
 }
-
-//type AllocationService struct {
-//}
