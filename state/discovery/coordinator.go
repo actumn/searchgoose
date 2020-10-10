@@ -4,7 +4,7 @@ import (
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/transport"
-	"log"
+	"github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -84,19 +84,19 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	nodes := newState.Nodes
 
 	for _, node := range nodes.Nodes {
-		log.Println("publish new state to node[" + node.Id + "]")
+		logrus.Info("publish new state to node[" + node.Id + "]")
 		c.TransportService.SendRequest(*node, "publish_state", newState.ToBytes(), func(response []byte) {
 
 		})
 	}
-	log.Println("publish ended successfully")
+	logrus.Info("publish ended successfully")
 }
 
 func (c *Coordinator) HandlePublish(channel transport.ReplyChannel, req []byte) []byte {
 	// handle publish
 	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.LocalNode)
 	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()
-	log.Println("accept new state ")
+	logrus.Info("accept new state ")
 	c.CoordinationState.PersistedState.SetLastAcceptedState(acceptedState)
 
 	// handle commit
@@ -135,7 +135,7 @@ func (f *CoordinatorPeerFinder) handleWakeUp() {
 	wg.Add(len(providedAddr))
 
 	for _, address := range providedAddr {
-		log.Printf("Attempting connection to %s\n", address)
+		logrus.Info("Attempting connection to ", address)
 		go f.startProbe(address)
 	}
 
@@ -151,7 +151,7 @@ func (f *CoordinatorPeerFinder) startProbe(address string) {
 
 func (f *CoordinatorPeerFinder) createConnectingPeer(address string) *state.Node {
 	// 여기서 Peer 만드셈
-	// log.Printf("Attempting connection to %s\n", address)
+	// logrus.Info("Attempting connection to %s\n", address)
 	return f.establishConnection(address)
 }
 
@@ -162,7 +162,7 @@ func (f *CoordinatorPeerFinder) establishConnection(address string) *state.Node 
 		// Peer Finding
 		node = &remoteNode
 		knownPeers := f.getConnectedPeers()
-		log.Printf("[Known Peers] %s\n", knownPeers)
+		logrus.Info("[Known Peers] ", knownPeers)
 
 		remotePeers := f.transportService.RequestPeers(remoteNode, knownPeers)
 

@@ -2,7 +2,7 @@ package index
 
 import (
 	"github.com/blevesearch/bleve/mapping"
-	"log"
+	"github.com/sirupsen/logrus"
 	"testing"
 )
 
@@ -11,9 +11,9 @@ func TestIndex_Get(t *testing.T) {
 	s := NewShard("/examples", indexMapping)
 	id := "test"
 	if doc, err := s.Get(id); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	} else {
-		log.Println(doc)
+		logrus.Info(doc)
 	}
 }
 
@@ -23,7 +23,7 @@ func TestIndex_Index(t *testing.T) {
 	id := "test"
 	doc := map[string]interface{}{}
 	if err := s.Index(id, doc); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 }
 
@@ -32,6 +32,6 @@ func TestIndex_Delete(t *testing.T) {
 	s := NewShard("/examples", indexMapping)
 	id := "test"
 	if err := s.Delete(id); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 }

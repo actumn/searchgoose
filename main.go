@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/discovery"
@@ -9,16 +10,31 @@ import (
 	"github.com/actumn/searchgoose/state/persist"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/actumn/searchgoose/state/transport/tcp"
-	"log"
+	"github.com/sirupsen/logrus"
+	"runtime"
+	"strings"
 )
 
 func main() {
 	start()
 }
 
+func init() {
+	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+			functionName := frame.Function[strings.LastIndex(frame.Function, ".")+1:]
+			fileName := frame.File[strings.LastIndex(frame.File, "/")+1:]
+			return fmt.Sprintf("%-20s", functionName+"()"), fmt.Sprintf("%s:%d\t", fileName, frame.Line)
+		},
+	})
+}
+
 func start() {
 	nodeId := cluster.GenerateNodeId()
-	log.Printf("[Node Id] : %s\n", nodeId)
+	logrus.Info("[Node Id]: ", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
 	address := "localhost:8179"
@@ -57,8 +73,10 @@ func start() {
 	coordinator.Start()
 	//coordinator.StartInitialJoin()
 
-	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService)
-	log.Println("start server...")
+	indexNameExpressionResolver := indices.NewNameExpressionResolver()
+
+	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService, indexNameExpressionResolver)
+	logrus.Info("start server...")
 	if err := b.Start(); err != nil {
 		panic(err)
 	}

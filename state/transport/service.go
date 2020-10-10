@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"github.com/actumn/searchgoose/state"
-	"log"
+	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -96,7 +96,7 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 			Action:  HANDSHAKE_REQ,
 			Content: nowNode.ToBytes(),
 		}
-		log.Printf("Send handshake REQ to %s\n", address)
+		logrus.Info("Send handshake REQ to ", address)
 		request := handshakeData.ToBytes()
 		s.SendRequestConn(conn, HANDSHAKE_REQ, request, func(response []byte) {
 			node := state.NodeFromBytes(response)
@@ -105,7 +105,7 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 		})
 	})
 
-	log.Printf("Connected with  %s\n", address)
+	logrus.Info("Connected with ", address)
 	time.Sleep(time.Duration(10) * time.Second)
 
 	callback(connectedNode)
@@ -114,7 +114,7 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 
 func (s *Service) handleHandshake(channel ReplyChannel, req []byte) []byte {
 	reqNode := state.NodeFromBytes(req)
-	log.Printf("Receive handshake REQ from %s\n", reqNode.HostAddress)
+	logrus.Info("Receive handshake REQ from ", reqNode.HostAddress)
 
 	nowNode := s.LocalNode
 	handshakeData := DataFormat{
@@ -135,7 +135,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 	}
 
 	nowNode := s.LocalNode
-	log.Printf("Send Peer Finding REQ to %s\n", node.HostAddress)
+	logrus.Info("Send Peer Finding REQ to ", node.HostAddress)
 	peerFindData := DataFormat{
 		Source:  nowNode.HostAddress,
 		Dest:    node.HostAddress,
@@ -143,14 +143,14 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 		Content: content.ToBytes(),
 	}
 
-	log.Printf("[%s] %s\n", PEERFIND_REQ, content)
+	logrus.Infof("[%s] %s", PEERFIND_REQ, content)
 
 	// TODO :: 나중에 request handler interface로 뽑아내기
 	request := peerFindData.ToBytes()
 	var peers []state.Node
 	s.SendRequest(node, PEERFIND_REQ, request, func(response []byte) {
 		peers = PeersResponseFromBytes(response).KnownPeers
-		log.Printf("%s received %s", s.LocalNode.HostAddress, peers)
+		logrus.Infof("%s received %s", s.LocalNode.HostAddress, peers)
 	})
 
 	return peers
@@ -158,7 +158,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 
 func (s *Service) HandlePeersRequest(channel ReplyChannel, req []byte) []byte {
 	request := PeersRequestFromBytes(req)
-	log.Printf("Receive Peer Finding REQ from %s\n", request.SourceNode.Id)
+	logrus.Info("Receive Peer Finding REQ from ", request.SourceNode.Id)
 
 	knownPeers := make([]state.Node, 0, len(s.ConnectionManager))
 	for peer := range s.ConnectionManager {
@@ -191,7 +191,7 @@ func (d *DataFormat) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(d); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -201,7 +201,7 @@ func DataFormatFromBytes(b []byte) *DataFormat {
 	decoder := gob.NewDecoder(buffer)
 	var data DataFormat
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &data
 }
@@ -215,7 +215,7 @@ func (r *PeersRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -225,7 +225,7 @@ func PeersRequestFromBytes(b []byte) *PeersRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data PeersRequest
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &data
 }
@@ -239,7 +239,7 @@ func (r *PeersResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -249,7 +249,7 @@ func PeersResponseFromBytes(b []byte) *PeersResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data PeersResponse
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &data
 }

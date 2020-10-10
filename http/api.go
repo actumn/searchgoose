@@ -7,8 +7,8 @@ import (
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/actumn/searchgoose/state/transport"
+	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
-	"log"
 )
 
 var (
@@ -53,7 +53,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 	if request.Path == "/favicon.ico" {
 		return
 	}
-	log.Println(request.Path)
+	logrus.Info(string(ctx.Method()), " ", request.Path, " ", string(ctx.Request.Body()))
 	allHandlers := c.pathTrie.retrieveAll(request.Path)
 	for {
 		h, params, err := allHandlers()
@@ -64,7 +64,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 			if err := json.NewEncoder(ctx).Encode(map[string]string{
 				"msg": "no route",
 			}); err != nil {
-				log.Println(err)
+				logrus.Error(err)
 			}
 			return
 		}
@@ -82,7 +82,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 			ctx.Response.SetStatusCode(response.StatusCode)
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			if err := json.NewEncoder(ctx).Encode(response.Body); err != nil {
-				log.Println(err)
+				logrus.Info(err)
 			}
 		})
 		return
@@ -98,6 +98,7 @@ func New(
 	clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService,
 	indicesService *indices.Service,
 	transportService *transport.Service,
+	indexNameExpressionResolver *indices.NameExpressionResolver,
 ) *Bootstrap {
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
@@ -119,11 +120,9 @@ func New(
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/{index}", actions.MethodHandlers{
-		actions.GET: &actions.RestGetIndex{},
-		actions.PUT: &actions.RestPutIndex{
-			CreateIndexService: clusterMetadataCreateIndexService,
-		},
-		actions.DELETE: &actions.RestDeleteIndex{},
+		actions.GET:    actions.NewRestGetIndex(clusterService, indexNameExpressionResolver),
+		actions.PUT:    actions.NewRestPutIndex(clusterMetadataCreateIndexService),
+		actions.DELETE: actions.NewRestDeleteIndex(),
 		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
