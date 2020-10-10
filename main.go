@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/discovery"
@@ -10,6 +11,8 @@ import (
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/actumn/searchgoose/state/transport/tcp"
 	"github.com/sirupsen/logrus"
+	"runtime"
+	"strings"
 )
 
 func main() {
@@ -18,14 +21,20 @@ func main() {
 
 func init() {
 	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
+		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+			functionName := frame.Function[strings.LastIndex(frame.Function, ".")+1:]
+			fileName := frame.File[strings.LastIndex(frame.File, "/")+1:]
+			return fmt.Sprintf("%-20s", functionName+"()"), fmt.Sprintf("%s:%d\t", fileName, frame.Line)
+		},
 	})
 }
 
 func start() {
 	nodeId := cluster.GenerateNodeId()
-	logrus.Info("[Node Id]: %s", nodeId)
+	logrus.Info("[Node Id]: ", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
 	address := "localhost:8179"

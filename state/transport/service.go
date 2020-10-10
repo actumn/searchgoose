@@ -96,7 +96,7 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 			Action:  HANDSHAKE_REQ,
 			Content: nowNode.ToBytes(),
 		}
-		logrus.Info("Send handshake REQ to %s", address)
+		logrus.Info("Send handshake REQ to ", address)
 		request := handshakeData.ToBytes()
 		s.SendRequestConn(conn, HANDSHAKE_REQ, request, func(response []byte) {
 			node := state.NodeFromBytes(response)
@@ -105,7 +105,7 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 		})
 	})
 
-	logrus.Info("Connected with  %s", address)
+	logrus.Info("Connected with ", address)
 	time.Sleep(time.Duration(10) * time.Second)
 
 	callback(connectedNode)
@@ -114,7 +114,7 @@ func (s *Service) ConnectToRemoteMasterNode(address string, callback func(node s
 
 func (s *Service) handleHandshake(channel ReplyChannel, req []byte) []byte {
 	reqNode := state.NodeFromBytes(req)
-	logrus.Info("Receive handshake REQ from %s", reqNode.HostAddress)
+	logrus.Info("Receive handshake REQ from ", reqNode.HostAddress)
 
 	nowNode := s.LocalNode
 	handshakeData := DataFormat{
@@ -135,7 +135,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 	}
 
 	nowNode := s.LocalNode
-	logrus.Info("Send Peer Finding REQ to %s", node.HostAddress)
+	logrus.Info("Send Peer Finding REQ to ", node.HostAddress)
 	peerFindData := DataFormat{
 		Source:  nowNode.HostAddress,
 		Dest:    node.HostAddress,
@@ -143,14 +143,14 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 		Content: content.ToBytes(),
 	}
 
-	logrus.Info("[%s] %s", PEERFIND_REQ, content)
+	logrus.Infof("[%s] %s", PEERFIND_REQ, content)
 
 	// TODO :: 나중에 request handler interface로 뽑아내기
 	request := peerFindData.ToBytes()
 	var peers []state.Node
 	s.SendRequest(node, PEERFIND_REQ, request, func(response []byte) {
 		peers = PeersResponseFromBytes(response).KnownPeers
-		logrus.Info("%s received %s", s.LocalNode.HostAddress, peers)
+		logrus.Infof("%s received %s", s.LocalNode.HostAddress, peers)
 	})
 
 	return peers
@@ -158,7 +158,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node) []state
 
 func (s *Service) HandlePeersRequest(channel ReplyChannel, req []byte) []byte {
 	request := PeersRequestFromBytes(req)
-	logrus.Info("Receive Peer Finding REQ from %s", request.SourceNode.Id)
+	logrus.Info("Receive Peer Finding REQ from ", request.SourceNode.Id)
 
 	knownPeers := make([]state.Node, 0, len(s.ConnectionManager))
 	for peer := range s.ConnectionManager {

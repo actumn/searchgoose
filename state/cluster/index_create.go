@@ -25,7 +25,7 @@ func NewMetadataCreateIndexService(clusterService state.ClusterService, allocati
 }
 
 func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpdateRequest) {
-	logrus.Info("Create index - index name: %s, mapping: %s", req.Index, string(req.Mappings))
+	logrus.Infof("Create index - index name: %s, mapping: %s", req.Index, string(req.Mappings))
 
 	s.ClusterService.SubmitStateUpdateTask(func(current state.ClusterState) state.ClusterState {
 		return s.applyCreateIndex(current, req)

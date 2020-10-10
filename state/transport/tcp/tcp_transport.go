@@ -63,7 +63,7 @@ func (t *Transport) Start(address string) {
 		if err != nil {
 			logrus.Fatalf("Fail to bind address to %s; err: %v", address, err)
 		}
-		logrus.Info("Success of listening on %s", address)
+		logrus.Info("Success of listening on ", address)
 		defer l.Close()
 
 		for {
@@ -106,7 +106,7 @@ func (t *Transport) OpenConnection(address string, callback func(conn transport.
 	if err != nil {
 		logrus.Fatalf("Failed to connect to %s : %v", address, err)
 	}
-	logrus.Info("Success on connecting %s", address)
+	logrus.Info("Success on connecting ", address)
 
 	callback(&Connection{
 		conn: conn,

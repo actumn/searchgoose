@@ -135,7 +135,7 @@ func (f *CoordinatorPeerFinder) handleWakeUp() {
 	wg.Add(len(providedAddr))
 
 	for _, address := range providedAddr {
-		logrus.Info("Attempting connection to %s", address)
+		logrus.Info("Attempting connection to ", address)
 		go f.startProbe(address)
 	}
 
@@ -162,7 +162,7 @@ func (f *CoordinatorPeerFinder) establishConnection(address string) *state.Node 
 		// Peer Finding
 		node = &remoteNode
 		knownPeers := f.getConnectedPeers()
-		logrus.Info("[Known Peers] %s", knownPeers)
+		logrus.Info("[Known Peers] ", knownPeers)
 
 		remotePeers := f.transportService.RequestPeers(remoteNode, knownPeers)
 
