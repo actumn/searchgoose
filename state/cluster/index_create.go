@@ -13,21 +13,21 @@ type CreateIndexClusterStateUpdateRequest struct {
 }
 
 type MetadataCreateIndexService struct {
-	ClusterService    state.ClusterService
-	AllocationService *AllocationService
+	clusterService    state.ClusterService
+	allocationService *AllocationService
 }
 
 func NewMetadataCreateIndexService(clusterService state.ClusterService, allocationService *AllocationService) *MetadataCreateIndexService {
 	return &MetadataCreateIndexService{
-		ClusterService:    clusterService,
-		AllocationService: allocationService,
+		clusterService:    clusterService,
+		allocationService: allocationService,
 	}
 }
 
 func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpdateRequest) {
 	logrus.Infof("Create index - index name: %s, mapping: %s", req.Index, string(req.Mappings))
 
-	s.ClusterService.SubmitStateUpdateTask(func(current state.ClusterState) state.ClusterState {
+	s.clusterService.SubmitStateUpdateTask(func(current state.ClusterState) state.ClusterState {
 		return s.applyCreateIndex(current, req)
 	})
 }
@@ -93,7 +93,7 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 		routingTable.IndicesRouting[k] = v
 	}
 
-	return s.AllocationService.reroute(state.ClusterState{
+	return s.allocationService.reroute(state.ClusterState{
 		Name:         current.Name,
 		StateUUID:    current.StateUUID,
 		Version:      current.Version,

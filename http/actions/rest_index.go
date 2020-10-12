@@ -2,6 +2,7 @@ package actions
 
 import (
 	"encoding/json"
+	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/sirupsen/logrus"
@@ -88,12 +89,12 @@ func (h *RestGetIndex) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type RestPutIndex struct {
-	CreateIndexService *cluster.MetadataCreateIndexService
+	createIndexService *cluster.MetadataCreateIndexService
 }
 
 func NewRestPutIndex(clusterIndexService *cluster.MetadataCreateIndexService) *RestPutIndex {
 	return &RestPutIndex{
-		CreateIndexService: clusterIndexService,
+		createIndexService: clusterIndexService,
 	}
 }
 
@@ -122,11 +123,12 @@ func (h *RestPutIndex) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 
-	h.CreateIndexService.CreateIndex(cluster.CreateIndexClusterStateUpdateRequest{
+	req := cluster.CreateIndexClusterStateUpdateRequest{
 		Index:    index,
 		Mappings: mapping,
 		Settings: body["settings"].(map[string]interface{}),
-	})
+	}
+	h.createIndexService.CreateIndex(req)
 
 	reply(RestResponse{
 		StatusCode: 200,
@@ -139,13 +141,33 @@ func (h *RestPutIndex) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type RestDeleteIndex struct {
+	clusterService              *cluster.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	deleteIndexService          *cluster.MetadataDeleteIndexService
 }
 
-func NewRestDeleteIndex() *RestDeleteIndex {
-	return &RestDeleteIndex{}
+func NewRestDeleteIndex(clusterService *cluster.Service, indexNameExpressionResolver *indices.NameExpressionResolver, deleteIndexService *cluster.MetadataDeleteIndexService) *RestDeleteIndex {
+	return &RestDeleteIndex{
+		clusterService:              clusterService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		deleteIndexService:          deleteIndexService,
+	}
 }
 
 func (h *RestDeleteIndex) Handle(r *RestRequest, reply ResponseListener) {
+	indexExpression := r.PathParams["index"]
+	clusterState := h.clusterService.State()
+	indexNames := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, indexExpression)
+
+	req := cluster.DeleteIndexClusterStateUpdateRequest{
+		Indices: []state.Index{},
+	}
+	for _, indexName := range indexNames {
+		req.Indices = append(req.Indices, clusterState.Metadata.Indices[indexName].Index)
+	}
+
+	h.deleteIndexService.DeleteIndex(req)
+
 	reply(RestResponse{
 		StatusCode: 200,
 		Body: map[string]interface{}{

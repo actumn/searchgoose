@@ -16,6 +16,24 @@ func NewClusterStateService(indices *Service) *ClusterStateService {
 }
 
 func (s *ClusterStateService) ApplyClusterState(event state.ClusterChangedEvent) {
+	s.deleteIndices(event)
+
+	s.createIndices(event)
+}
+
+func (s *ClusterStateService) deleteIndices(event state.ClusterChangedEvent) {
+	//previousState := event.PrevState
+	//currentState := event.State
+	//localNodeId := currentState.Nodes.LocalNodeId
+
+	for _, idx := range event.IndicesDeleted() {
+		if _, existing := s.IndicesService.IndexService(idx.Uuid); existing {
+			s.IndicesService.RemoveIndex(idx)
+		}
+	}
+}
+
+func (s *ClusterStateService) createIndices(event state.ClusterChangedEvent) {
 	clusterState := event.State
 
 	routingNodes := state.NewRoutingNodes(clusterState)

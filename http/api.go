@@ -96,6 +96,7 @@ type Bootstrap struct {
 func New(
 	clusterService *cluster.Service,
 	clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService,
+	clusterMetadataDeleteIndexService *cluster.MetadataDeleteIndexService,
 	indicesService *indices.Service,
 	transportService *transport.Service,
 	indexNameExpressionResolver *indices.NameExpressionResolver,
@@ -122,7 +123,7 @@ func New(
 	c.pathTrie.insert("/{index}", actions.MethodHandlers{
 		actions.GET:    actions.NewRestGetIndex(clusterService, indexNameExpressionResolver),
 		actions.PUT:    actions.NewRestPutIndex(clusterMetadataCreateIndexService),
-		actions.DELETE: actions.NewRestDeleteIndex(),
+		actions.DELETE: actions.NewRestDeleteIndex(clusterService, indexNameExpressionResolver, clusterMetadataDeleteIndexService),
 		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
