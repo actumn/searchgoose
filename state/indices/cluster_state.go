@@ -3,10 +3,12 @@ package indices
 import (
 	"github.com/actumn/searchgoose/state"
 	"github.com/sirupsen/logrus"
+	"sync"
 )
 
 type ClusterStateService struct {
 	IndicesService *Service
+	mux            sync.Mutex
 }
 
 func NewClusterStateService(indices *Service) *ClusterStateService {
@@ -39,6 +41,8 @@ func (s *ClusterStateService) createIndices(event state.ClusterChangedEvent) {
 	routingNodes := state.NewRoutingNodes(clusterState)
 	localNode := routingNodes.NodesToShards[clusterState.Nodes.LocalNodeId]
 
+	// TODO:: migrate to channel from mutex
+	s.mux.Lock()
 	for _, shardRouting := range localNode.Shards {
 		index := shardRouting.ShardId.Index
 
@@ -46,13 +50,14 @@ func (s *ClusterStateService) createIndices(event state.ClusterChangedEvent) {
 			indexService = s.IndicesService.CreateIndexService(index.Uuid)
 			indexMetadata := clusterState.Metadata.Indices[index.Name]
 			indexService.UpdateMapping(indexMetadata)
-			logrus.Infof("Create new index shard - index uuid: %s, shard number: %d", index.Uuid, shardRouting.ShardId.ShardId)
+			logrus.Infof("Create new index shard - index name: %s, index uuid: %s, shard number: %d", index.Name, index.Uuid, shardRouting.ShardId.ShardId)
 			indexService.CreateShard(shardRouting.ShardId.ShardId)
 		} else {
 			if _, exists := indexService.Shard(shardRouting.ShardId.ShardId); !exists {
-				logrus.Infof("Create existing index shard - index uuid: %s, shard number: %d", index.Uuid, shardRouting.ShardId.ShardId)
+				logrus.Infof("Create existing index shard - index name: %s, index uuid: %s, shard number: %d", index.Name, index.Uuid, shardRouting.ShardId.ShardId)
 				indexService.CreateShard(shardRouting.ShardId.ShardId)
 			}
 		}
 	}
+	s.mux.Unlock()
 }
