@@ -38,11 +38,9 @@ func (s *Service) UpdateMapping(metadata state.IndexMetadata) {
 		props := fieldProps.(map[string]interface{})
 
 		switch props["type"] {
-		case "text":
+		case "text", "keyword":
 			docMapping.AddFieldMappingsAt(field, mapping.NewTextFieldMapping())
-		case "integer":
-			docMapping.AddFieldMappingsAt(field, mapping.NewNumericFieldMapping())
-		case "float":
+		case "long", "integer", "short", "byte", "double", "float", "half_float", "scaled_float":
 			docMapping.AddFieldMappingsAt(field, mapping.NewNumericFieldMapping())
 		case "date":
 			docMapping.AddFieldMappingsAt(field, mapping.NewDateTimeFieldMapping())
