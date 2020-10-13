@@ -1,7 +1,7 @@
 version: '2'
 services:
   kibana:
-    image: docker.elastic.co/kibana/kibana:7.8.0
+    image: docker.elastic.co/kibana/kibana:7.8.1
     ports:
     - 5601:5601
     volumes:

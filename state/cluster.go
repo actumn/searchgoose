@@ -11,3 +11,15 @@ type ClusterChangedEvent struct {
 	State     ClusterState
 	PrevState ClusterState
 }
+
+func (e *ClusterChangedEvent) IndicesDeleted() []Index {
+	var deleted []Index
+
+	for _, index := range e.PrevState.Metadata.Indices {
+		if _, existing := e.State.Metadata.Indices[index.Index.Name]; !existing {
+			deleted = append(deleted, index.Index)
+		}
+	}
+
+	return deleted
+}
