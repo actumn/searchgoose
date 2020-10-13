@@ -119,7 +119,6 @@ func NewRestSearch(clusterService *cluster.Service, indicesService *indices.Serv
 		r, err := indexShard.Search(searchRequest)
 		if err != nil {
 			logrus.Fatal(err)
-			return
 		}
 		data.Results = r
 
@@ -156,13 +155,7 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
-		reply(RestResponse{
-			StatusCode: 400,
-			Body: map[string]interface{}{
-				"err": err,
-			},
-		})
-		return
+		logrus.Fatal(err)
 	}
 	clusterState := h.clusterService.State()
 	shardNum := clusterState.Metadata.Indices[indexName].RoutingNumShards
