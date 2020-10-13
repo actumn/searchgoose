@@ -112,6 +112,10 @@ func New(
 	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
 		actions.GET: &actions.RestTemplates{},
 	})
+	c.pathTrie.insert("/_alias/{name}", actions.MethodHandlers{
+		actions.GET:  actions.NewRestGetIndexAlias(),
+		actions.POST: actions.NewRestPostIndexAlias(),
+	})
 	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
 		actions.GET: &actions.RestNodes{
 			ClusterService: clusterService,
