@@ -56,7 +56,7 @@ type RestIndexDoc struct {
 
 func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDoc {
 	// Handle primary shard request
-	transportService.RegisterRequestHandler(IndexAction, func(channel transport.ReplyChannel, req []byte) []byte {
+	transportService.RegisterRequestHandler(IndexAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("indexAction on primary shard")
 		request := indexRequestFromBytes(req)
 
@@ -72,7 +72,7 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 		if err := indexShard.Index(request.Id, body); err != nil {
 			logrus.Fatal(err)
 		}
-		return []byte("success")
+		channel.SendMessage("", []byte("success"))
 	})
 
 	return &RestIndexDoc{
@@ -167,7 +167,7 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 		Source:  r.Body,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -247,7 +247,7 @@ type RestGetDoc struct {
 }
 
 func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestGetDoc {
-	transportService.RegisterRequestHandler(GetAction, func(channel transport.ReplyChannel, req []byte) []byte {
+	transportService.RegisterRequestHandler(GetAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("getAction on shard")
 		request := getRequestFromBytes(req)
 
@@ -259,7 +259,7 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 			res := getResponse{
 				Err: err,
 			}
-			return res.toBytes()
+			channel.SendMessage("", res.toBytes())
 		} else {
 			res := getResponse{
 				Index:   request.Index,
@@ -267,7 +267,7 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 				ShardId: request.ShardId,
 				Fields:  doc,
 			}
-			return res.toBytes()
+			channel.SendMessage("", res.toBytes())
 		}
 	})
 
@@ -289,7 +289,7 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 		Id:      documentId,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
 		res := getResponseFromBytes(response)
 		if res.Err != nil {
 			reply(RestResponse{
@@ -353,7 +353,7 @@ type RestDeleteDoc struct {
 }
 
 func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestDeleteDoc {
-	transportService.RegisterRequestHandler(DeleteAction, func(channel transport.ReplyChannel, req []byte) []byte {
+	transportService.RegisterRequestHandler(DeleteAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("deleteAction on primary shard")
 		request := deleteRequestFromBytes(req)
 
@@ -365,7 +365,7 @@ func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.S
 			logrus.Fatal(err)
 		}
 
-		return []byte("success")
+		channel.SendMessage("", []byte("success"))
 	})
 
 	return &RestDeleteDoc{
@@ -387,7 +387,7 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 		ShardId: shardRouting.ShardId,
 	}
 
-	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], DeleteAction, deleteRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], DeleteAction, deleteRequest.toBytes(), func(response []byte) {
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
