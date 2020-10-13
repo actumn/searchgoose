@@ -5,14 +5,84 @@ import (
 	"github.com/actumn/searchgoose/index"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
+	"github.com/actumn/searchgoose/state/transport"
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/search/query"
 	"github.com/nqd/flat"
+	"strings"
+)
+
+const (
+	SearchAction = "search"
 )
 
 type RestSearch struct {
-	ClusterService *cluster.Service
-	IndicesService *indices.Service
+	clusterService   *cluster.Service
+	indicesService   *indices.Service
+	transportService *transport.Service
+}
+
+type SearchRequest struct {
+	searchType string
+	searchBody map[string]interface{}
+}
+
+func (r *SearchRequest) ToBytes() []byte {
+	gap := 12 - len(r.searchType)
+	t := []byte(r.searchType + strings.Repeat("=", gap))
+	b, _ := json.Marshal(r.searchBody)
+
+	return append(t, b...)
+}
+
+func SearchRequestFromBytes(b []byte) *SearchRequest {
+	t := string(b[0:12])
+	var body map[string]interface{}
+	_ = json.Unmarshal(b[12:] ,&body)
+
+	return &SearchRequest{
+		searchType: t,
+		searchBody: body,
+	}
+}
+
+type SearchResponse struct {
+
+}
+
+func (r *SearchResponse) ToBytes() []byte {
+
+}
+
+func SearchResponseFromBytes(b []byte) *SearchResponse {
+
+}
+
+func NewRestSearch(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestSearch {
+	transportService.RegisterRequestHandler(SearchAction, func(channel transport.ReplyChannel, req []byte) []byte {
+		request := SearchRequestFromBytes(req)
+
+		res := SearchResponse{}
+		return res.ToBytes()
+	})
+
+	for i := 0; i < shardCount; i++ {
+
+		request := SearchRequest{
+
+		}
+		transportService.SendRequest(node, SearchAction, request.ToBytes(), func(response []byte) {
+			res := SearchResponseFromBytes(response)
+
+		})
+
+	}
+
+	return &RestSearch{
+		clusterService:   clusterService,
+		indicesService:   indicesService,
+		transportService: transportService,
+	}
 }
 
 type SearchResultData struct {
@@ -41,12 +111,12 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 		qType = v.(map[string]interface{})
 	}
 
-	clusterState := h.ClusterService.State()
+	clusterState := h.clusterService.State()
 	idx := clusterState.Metadata.Indices[indexName].Index
 	shardNum := clusterState.Metadata.Indices[indexName].RoutingNumShards
 	uuid := idx.Uuid
 
-	indexService, _ := h.IndicesService.IndexService(uuid)
+	indexService, _ := h.indicesService.IndexService(uuid)
 
 	var shards []*index.Shard
 	for i := 0; i < shardNum; i++ {
@@ -79,6 +149,14 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			},
 		})
 		return
+	}
+
+	for shardNum, shardRouting := range clusterState.RoutingTable.IndicesRouting[indexName].Shards {
+		node := clusterState.Nodes.Nodes[shardRouting.Primary.CurrentNodeId]
+
+		h.transportService.SendRequest(*node, SearchAction, []byte("data"), func(response []byte) {
+
+		})
 	}
 
 	searchRequest := bleve.NewSearchRequest(q)
