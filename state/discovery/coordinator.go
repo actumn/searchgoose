@@ -6,7 +6,6 @@ import (
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 type Mode int
@@ -50,14 +49,14 @@ func NewCoordinator(transportService *transport.Service, clusterApplierService *
 		maxTermSeen:           1,
 	}
 
-	c.TransportService.RegisterRequestHandler("publish_state", c.HandlePublish)
+	c.TransportService.RegisterRequestHandler("publish_state", c.handlePublish)
 
 	c.PreVoteCollector = NewPreVoteCollector(transportService, c.startElection, c.updateMaxTermSeen)
 	c.TransportService.RegisterRequestHandler(transport.PREVOTE_REQ, c.PreVoteCollector.handlePreVoteRequest)
 
-	c.JoinHelper = NewJoinHelper(transportService, c.joinLeaderInTerm, c.getCurrentTerm, c.HandleJoinRequest)
-	c.TransportService.RegisterRequestHandler(transport.START_JOIN, c.JoinHelper.HandleStartJoinRequest)
-	c.TransportService.RegisterRequestHandler(transport.JOIN_REQ, c.HandleJoinRequest)
+	c.JoinHelper = NewJoinHelper(transportService, c.joinLeaderInTerm, c.getCurrentTerm, c.handleJoinRequest)
+	c.TransportService.RegisterRequestHandler(transport.START_JOIN, c.JoinHelper.handleStartJoinRequest)
+	c.TransportService.RegisterRequestHandler(transport.JOIN_REQ, c.handleJoinRequest)
 
 	return c
 }
@@ -71,6 +70,7 @@ func (c *Coordinator) Start() {
 
 	c.ApplierState = c.PersistedState.GetLastAcceptedState()
 	//c.ApplierState = &state.ClusterState{
+
 	//	Name: "searchgoose-testClusters",
 	//	Nodes: &state.Nodes{
 	//		Nodes: map[string]*state.Node{
@@ -168,7 +168,7 @@ func (c *Coordinator) joinLeaderInTerm(request *StartJoinRequest) *state.Join {
 	return join
 }
 
-func (c *Coordinator) HandleJoinRequest(channel transport.ReplyChannel, req []byte) {
+func (c *Coordinator) handleJoinRequest(channel transport.ReplyChannel, req []byte) {
 	// transportService.connectToNode -> 대체 왜?
 	joinReqData := JoinRequestFromBytes(req)
 	logrus.Printf("handleJoinRequest: as {%d}, handling %v\n", c.mode, joinReqData)
@@ -227,7 +227,7 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	logrus.Info("publish ended successfully")
 }
 
-func (c *Coordinator) HandlePublish(channel transport.ReplyChannel, req []byte) {
+func (c *Coordinator) handlePublish(channel transport.ReplyChannel, req []byte) {
 	// handle publish
 	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.LocalNode)
 	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()
@@ -282,7 +282,7 @@ func (f *CoordinatorPeerFinder) handleWakeUp() {
 	}
 }
 
-func (f *CoordinatorPeerFinder) StartProbe(address string /*wg *sync.WaitGroup*/) {
+func (f *CoordinatorPeerFinder) startProbe(address string /*wg *sync.WaitGroup*/) {
 	if _, ok := f.PeersByAddress[address]; !ok {
 		f.createConnection(address)
 	}

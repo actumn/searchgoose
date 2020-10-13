@@ -37,7 +37,7 @@ func (h *JoinHelper) SendStartJoinRequest(startJoinRequest StartJoinRequest, des
 	})
 }
 
-func (h *JoinHelper) HandleStartJoinRequest(channel transport.ReplyChannel, req []byte) {
+func (h *JoinHelper) handleStartJoinRequest(channel transport.ReplyChannel, req []byte) {
 	startJoinReqData := StartJoinRequestFromBytes(req)
 	destination := startJoinReqData.SourceNode
 

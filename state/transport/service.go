@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"github.com/actumn/searchgoose/state"
-	"sync"
 	"github.com/sirupsen/logrus"
-	"time"
+	"sync"
 )
 
 const (
@@ -127,13 +126,13 @@ func (s *Service) ConnectToRemoteNode(address string, callback func(node *state.
 	curNode := s.LocalNode
 
 	if curNode.HostAddress == address {
-		log.Printf("ConnectToRemoteNode(%s) not connecting local node ", address)
+		logrus.Printf("ConnectToRemoteNode(%s) not connecting local node ", address)
 		return
 	}
 
 	for _, value := range s.ConnectionManager {
 		if value.node.HostAddress == address {
-			log.Printf("Connection is already established; %s", address)
+			logrus.Printf("Connection is already established; %s", address)
 			return
 		}
 	}
@@ -177,7 +176,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node, callbac
 		KnownPeers: knownPeers,
 	}
 
-	log.Printf("Peer=%v requesting peers %s\n", nowNode, knownPeers)
+	logrus.Printf("Peer=%v requesting peers %s\n", nowNode, knownPeers)
 
 	// TODO :: 나중에 request handler interface로 뽑아내기
 	request := peerFindData.ToBytes()
@@ -186,7 +185,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node, callbac
 		data := PeersResponseFromBytes(res)
 		peers := data.KnownPeers
 
-		log.Printf("Peer=%v received PeersResponse=%v\n", nowNode, data)
+		logrus.Printf("Peer=%v received PeersResponse=%v\n", nowNode, data)
 
 		for _, peer := range peers {
 			go s.ConnectToRemoteNode(peer.HostAddress, func(remoteNode *state.Node) {
@@ -224,7 +223,7 @@ func (s *Service) handleHandshake(channel ReplyChannel, req []byte) {
 func (s *Service) handlePeersRequest(channel ReplyChannel, req []byte) {
 
 	peerReqData := PeersRequestFromBytes(req)
-	log.Printf("Receive Peer Finding REQ from %s; %s\n", channel.GetDestAddress(), peerReqData.KnownPeers)
+	logrus.Printf("Receive Peer Finding REQ from %s; %s\n", channel.GetDestAddress(), peerReqData.KnownPeers)
 
 	peers := peerReqData.KnownPeers
 	for _, peer := range peers {
@@ -284,7 +283,7 @@ func (h *HandshakeResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(h); err != nil {
-		log.Fatalln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -294,7 +293,7 @@ func HandshakeResponseFromBytes(b []byte) *HandshakeResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data HandshakeResponse
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }

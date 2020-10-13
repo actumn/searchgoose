@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/discovery"
 	"github.com/actumn/searchgoose/state/indices"
@@ -8,10 +9,10 @@ import (
 	"github.com/actumn/searchgoose/state/persist"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/actumn/searchgoose/state/transport/tcp"
-	"time"
 	"github.com/sirupsen/logrus"
 	"runtime"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -64,19 +65,24 @@ func start() {
 	clusterService.ApplierService.AddApplier(indicesClusterStateService.ApplyClusterState)
 	clusterService.MasterService.ClusterStatePublish = coordinator.Publish
 
-	allocationService := cluster.NewAllocationService()
-	clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService, allocationService)
+	//allocationService := cluster.NewAllocationService()
+	//clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService, allocationService)
 
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator.Start()
-	//coordinator.StartInitialJoin()
+	time.Sleep(time.Duration(15) * time.Second)
 
-	indexNameExpressionResolver := indices.NewNameExpressionResolver()
+	coordinator.StartInitialJoin()
+	time.Sleep(time.Duration(1000) * time.Second)
 
-	b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService, indexNameExpressionResolver)
-	logrus.Info("start server...")
-	if err := b.Start(); err != nil {
-		panic(err)
-	}
+	/*
+		b := http.New(clusterService, clusterMetadataCreateIndexService, indicesService, transportService)
+		log.Println("start server...")
+		if err := b.Start(":8080"); err != nil {
+			panic(err)
+		}
+		//if err := b.Start(":8081"); err != nil { panic(err) }
+		//if err := b.Start(":8082"); err != nil { panic(err) }
+	*/
 }

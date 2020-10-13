@@ -6,6 +6,7 @@ import (
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
 	"io"
+	"log"
 	"net"
 )
 
@@ -34,7 +35,7 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 
 	_, err := c.conn.Write(request.ToBytes())
 	if err != nil {
-		log.Printf("Fail to send request; err:%v\n", err)
+		logrus.Printf("Fail to send request; err:%v\n", err)
 	}
 	go func() {
 		recvBuf := make([]byte, 4096)
@@ -45,7 +46,7 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 			return
 		}
 		response := DataFormatFromBytes(recvBuf[:n])
-		log.Printf("Receive %s from %s\n", response.Action, response.Source)
+		logrus.Printf("Receive %s from %s\n", response.Action, response.Source)
 		callback(response.Content)
 	}()
 }
@@ -126,32 +127,29 @@ func (t *Transport) Start(address string) {
 					return
 				}
 				if 0 < n {
-					// Receive request data
-					recvData := transport.DataFormatFromBytes(recvBuf[:n])
-					action := recvData.Action
-					data := recvData.Content
-				for {
-					recvBuf := make([]byte, 4096)
-					n, err := conn.Read(recvBuf)
-					if err != nil {
-						if io.EOF == err {
-							log.Printf("connection is closed from client; %v", conn.RemoteAddr().String())
+					for {
+						recvBuf := make([]byte, 4096)
+						n, err := conn.Read(recvBuf)
+						if err != nil {
+							if io.EOF == err {
+								log.Printf("connection is closed from client; %v", conn.RemoteAddr().String())
+								return
+							}
+							log.Printf("Fail to receive data; err: %v", err)
 							return
 						}
-						log.Printf("Fail to receive data; err: %v", err)
-						return
-					}
-					if 0 < n {
-						// Receive request data
-						recvData := DataFormatFromBytes(recvBuf[:n])
-						action := recvData.Action
-						data := recvData.Content
+						if 0 < n {
+							// Receive request data
+							recvData := DataFormatFromBytes(recvBuf[:n])
+							action := recvData.Action
+							data := recvData.Content
 
-						t.RequestHandlers[action](&ReplyChannel{
-							conn:         conn,
-							localAddress: t.LocalAddress,
-							destAddress:  recvData.Source,
-						}, data)
+							t.RequestHandlers[action](&ReplyChannel{
+								conn:         conn,
+								localAddress: t.LocalAddress,
+								destAddress:  recvData.Source,
+							}, data)
+						}
 					}
 				}
 			}(conn)

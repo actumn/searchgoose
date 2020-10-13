@@ -3,7 +3,7 @@ package state
 import (
 	"bytes"
 	"encoding/gob"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 type Node struct {
