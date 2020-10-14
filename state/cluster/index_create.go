@@ -44,6 +44,7 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 			Uuid: common.RandomBase64(),
 		},
 		RoutingNumShards: routingNumShards,
+		Aliases:          map[string]state.AliasMetadata{},
 		Mapping: map[string]state.MappingMetadata{
 			"_doc": {
 				Type:   "_doc",

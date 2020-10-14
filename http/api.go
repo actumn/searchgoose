@@ -59,6 +59,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		h, params, err := allHandlers()
 		request.PathParams = params
 		if err != nil {
+			logrus.Warn(string(ctx.Method()), " ", request.Path, " ", err)
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			ctx.Response.SetStatusCode(400)
 			if err := json.NewEncoder(ctx).Encode(map[string]string{
@@ -113,11 +114,11 @@ func New(
 	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
 		actions.GET: &actions.RestTemplates{},
 	})
-	c.pathTrie.insert("/_alias", actions.MethodHandlers{
+	c.pathTrie.insert("/_aliases", actions.MethodHandlers{
 		actions.POST: actions.NewRestPostIndexAlias(clusterMetadataIndexAliasService),
 	})
 	c.pathTrie.insert("/_alias/{name}", actions.MethodHandlers{
-		actions.GET: actions.NewRestGetIndexAlias(),
+		actions.GET: actions.NewRestGetIndexAlias(clusterService, indexNameExpressionResolver),
 	})
 	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
 		actions.GET: &actions.RestNodes{

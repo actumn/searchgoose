@@ -144,6 +144,39 @@ type Metadata struct {
 	//Templates    map[string]IndexTemplateMetadata
 }
 
+func (m *Metadata) FindAliases(aliases []string, concreteIndices []string) map[string][]AliasMetadata {
+	if len(concreteIndices) == 0 {
+		return map[string][]AliasMetadata{}
+	}
+
+	var patterns []string
+	for _, alias := range aliases {
+		patterns = append(patterns, alias)
+	}
+
+	result := map[string][]AliasMetadata{}
+	for _, index := range concreteIndices {
+		indexMetadata := m.Indices[index]
+		var filteredValues []AliasMetadata
+		for _, value := range indexMetadata.Aliases {
+			matched := false
+			alias := value.Alias
+			for _, pattern := range patterns {
+				matched = pattern == alias
+			}
+
+			if matched {
+				filteredValues = append(filteredValues, value)
+			}
+		}
+
+		if len(filteredValues) > 0 {
+			result[index] = filteredValues
+		}
+	}
+	return result
+}
+
 type Index struct {
 	Name string
 	Uuid string
