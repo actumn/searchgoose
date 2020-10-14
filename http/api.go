@@ -97,6 +97,7 @@ func New(
 	clusterService *cluster.Service,
 	clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService,
 	clusterMetadataDeleteIndexService *cluster.MetadataDeleteIndexService,
+	clusterMetadataIndexAliasService *cluster.MetadataIndexAliasService,
 	indicesService *indices.Service,
 	transportService *transport.Service,
 	indexNameExpressionResolver *indices.NameExpressionResolver,
@@ -112,9 +113,11 @@ func New(
 	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
 		actions.GET: &actions.RestTemplates{},
 	})
+	c.pathTrie.insert("/_alias", actions.MethodHandlers{
+		actions.POST: actions.NewRestPostIndexAlias(clusterMetadataIndexAliasService),
+	})
 	c.pathTrie.insert("/_alias/{name}", actions.MethodHandlers{
-		actions.GET:  actions.NewRestGetIndexAlias(),
-		actions.POST: actions.NewRestPostIndexAlias(),
+		actions.GET: actions.NewRestGetIndexAlias(),
 	})
 	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
 		actions.GET: &actions.RestNodes{

@@ -155,8 +155,13 @@ type IndexMetadata struct {
 	//RoutingNumReplicas int
 	//Version            int64
 	//State              IndexMetadataState
+	Aliases map[string]AliasMetadata
 	Mapping map[string]MappingMetadata
 	//Settings Settings
+}
+
+type AliasMetadata struct {
+	Alias string
 }
 
 /*
