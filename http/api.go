@@ -146,6 +146,10 @@ func New(
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
 		actions.GET: actions.NewRestSearch(clusterService, indicesService, transportService),
 	})
+	c.pathTrie.insert("/{index}/_refresh", actions.MethodHandlers{
+		actions.GET:  actions.NewRestRefresh(clusterService),
+		actions.POST: actions.NewRestRefresh(clusterService),
+	})
 	//c.pathTrie.insert("/{index}/_bulk", actions.MethodHandlers{
 	//	actions.POST: ,
 	//	actions.PUT: ,
