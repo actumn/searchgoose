@@ -11,11 +11,6 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-var (
-	strContentType     = []byte("Content-Type")
-	strApplicationJSON = []byte("application/json")
-)
-
 func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 	request := actions.RestRequest{
 		Path:        string(ctx.Path()),
@@ -53,14 +48,14 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 	if request.Path == "/favicon.ico" {
 		return
 	}
-	logrus.Info(string(ctx.Method()), " ", request.Path, " ", string(ctx.Request.Body()))
+	logrus.Info(string(ctx.Method()), " ", string(ctx.Request.RequestURI()), " ", string(ctx.Request.Body()))
 	allHandlers := c.pathTrie.retrieveAll(request.Path)
 	for {
 		h, params, err := allHandlers()
 		request.PathParams = params
 		if err != nil {
 			logrus.Warn(string(ctx.Method()), " ", request.Path, " ", err)
-			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+			ctx.Response.Header.SetCanonical([]byte("Content-Type"), []byte("application/json"))
 			ctx.Response.SetStatusCode(400)
 			if err := json.NewEncoder(ctx).Encode(map[string]string{
 				"msg": "no route",
@@ -82,7 +77,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		handler.Handle(&request, func(response actions.RestResponse) {
 			logrus.Debug("reply on ", string(ctx.Method()), " ", request.Path)
 			ctx.Response.SetStatusCode(response.StatusCode)
-			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
+			ctx.Response.Header.SetCanonical([]byte("Content-Type"), []byte("application/json"))
 			if err := json.NewEncoder(ctx).Encode(response.Body); err != nil {
 				logrus.Error(err)
 			}
@@ -107,13 +102,7 @@ func New(
 	c := RequestController{}
 	c.pathTrie = newPathTrie()
 	c.pathTrie.insert("/", actions.MethodHandlers{
-		actions.GET: &actions.RestMain{},
-	})
-	c.pathTrie.insert("/_cat/templates", actions.MethodHandlers{
-		actions.GET: &actions.RestTemplates{},
-	})
-	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
-		actions.GET: &actions.RestTemplates{},
+		actions.GET: actions.NewRestMain(clusterService),
 	})
 	c.pathTrie.insert("/_aliases", actions.MethodHandlers{
 		actions.POST: actions.NewRestPostIndexAlias(clusterMetadataIndexAliasService),
@@ -122,13 +111,41 @@ func New(
 		actions.GET: actions.NewRestGetIndexAlias(clusterService, indexNameExpressionResolver),
 	})
 	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
-		actions.GET: &actions.RestNodes{
-			ClusterService: clusterService,
-		},
+		actions.GET: actions.NewRestNodes(clusterService),
 	})
 	c.pathTrie.insert("/_xpack", actions.MethodHandlers{
 		actions.GET: &actions.RestXpack{},
 	})
+	c.pathTrie.insert("/_stats", actions.MethodHandlers{
+		actions.GET: actions.NewRestIndicesStatsAction(indicesService),
+	})
+
+	///////////////////////////// cat /////////////////////////////////////
+	c.pathTrie.insert("/_cat/templates", actions.MethodHandlers{
+		actions.GET: &actions.RestCatTemplates{},
+	})
+	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
+		actions.GET: &actions.RestCatTemplates{},
+	})
+	c.pathTrie.insert("/_cat/nodes", actions.MethodHandlers{
+		actions.GET: actions.NewRestCatNodes(),
+	})
+	c.pathTrie.insert("/_cat/indices", actions.MethodHandlers{
+		actions.GET: actions.NewRestCatIndices(indexNameExpressionResolver),
+	})
+
+	//////////////////////////// cluster //////////////////////////////////
+	c.pathTrie.insert("/_cluster/health", actions.MethodHandlers{
+		actions.GET: actions.NewRestClusterHealth(clusterService, indexNameExpressionResolver),
+	})
+	c.pathTrie.insert("/_cluster/state/metadata", actions.MethodHandlers{
+		actions.GET: actions.NewRestClusterStateMetadata(clusterService),
+	})
+	c.pathTrie.insert("/_cluster/stats", actions.MethodHandlers{
+		actions.GET: actions.NewRestClusterStats(clusterService, transportService, indicesService),
+	})
+
+	//////////////////////////// index ////////////////////////////////////
 	c.pathTrie.insert("/{index}", actions.MethodHandlers{
 		actions.GET:    actions.NewRestGetIndex(clusterService, indexNameExpressionResolver),
 		actions.PUT:    actions.NewRestPutIndex(clusterMetadataCreateIndexService),
@@ -142,7 +159,11 @@ func New(
 		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 		actions.PUT:    actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
-		actions.HEAD:   &actions.RestHeadDoc{},
+	})
+	c.pathTrie.insert("/{index}/{type}/{id}", actions.MethodHandlers{ // deprecated but just for elasticsearch-HQ
+		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.PUT:    actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
+		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
 		actions.GET:  actions.NewRestSearch(clusterService, indicesService, indexNameExpressionResolver, transportService),
@@ -156,11 +177,13 @@ func New(
 	//	actions.POST: ,
 	//	actions.PUT: ,
 	//})
+	c.pathTrie.insert("/{index}/{type}/{id}/_source", actions.MethodHandlers{
+		actions.GET: actions.NewRestGetSource(clusterService, indicesService, indexNameExpressionResolver, transportService),
+	})
 
 	s := &fasthttp.Server{
 		Handler: c.HandleFastHTTP,
 	}
-
 	return &Bootstrap{
 		s: s,
 	}

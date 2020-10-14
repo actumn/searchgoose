@@ -5,7 +5,13 @@ import (
 )
 
 type RestNodes struct {
-	ClusterService *cluster.Service
+	clusterService *cluster.Service
+}
+
+func NewRestNodes(clusterService *cluster.Service) *RestNodes {
+	return &RestNodes{
+		clusterService: clusterService,
+	}
 }
 
 func (h *RestNodes) Handle(r *RestRequest, reply ResponseListener) {

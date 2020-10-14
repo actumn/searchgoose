@@ -34,7 +34,7 @@ func (s *AllocationService) reroute(clusterState state.ClusterState) state.Clust
 		minWeight := math.MaxFloat64
 		for _, node := range routingNodes.NodesToShards {
 			indexName := shard.ShardId.Index.Name
-			//avgShardsPerNodeOfIndex := float64(clusterState.Metadata.Indices[indexName].RoutingNumShards / nodes)
+			//avgShardsPerNodeOfIndex := float64(clusterState.Metadata.Indices[indexName].NumberOfShards / nodes)
 			currentWeight := weight(*node, indexName)
 
 			if currentWeight > minWeight {

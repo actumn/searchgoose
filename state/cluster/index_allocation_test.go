@@ -41,7 +41,7 @@ func TestAllocationService_reroute(t *testing.T) {
 						Name: "test",
 						Uuid: "testUuid",
 					},
-					RoutingNumShards: 3,
+					NumberOfShards: 3,
 				},
 			},
 		},

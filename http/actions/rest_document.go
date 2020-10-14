@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
 	"github.com/actumn/searchgoose/common"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
@@ -117,7 +116,6 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		h.createIndexService.CreateIndex(req)
 		indexName = indexExpression
 		clusterState = h.clusterService.State()
-
 	}
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
@@ -126,7 +124,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		Source:  r.Body,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
 		logrus.Info("callback success")
 		reply(RestResponse{
 			StatusCode: 200,
@@ -205,7 +203,7 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 		Source:  r.Body,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -324,13 +322,40 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 
 	clusterState := h.clusterService.State()
 	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
+	if indexName == "" {
+		reply(RestResponse{
+			StatusCode: 404,
+			Body: map[string]interface{}{
+				"error": map[string]interface{}{
+					"root_cause": []map[string]interface{}{
+						{
+							"type":          "index_not_found_exception",
+							"reason":        "no such index [" + indexExpression + "]",
+							"resource.type": "index_or_alias",
+							"resource.id":   ".kibana",
+							"index_uuid":    "_na_",
+							"index":         ".kibana",
+						},
+					},
+					"type":          "index_not_found_exception",
+					"reason":        "no such index [" + indexExpression + "]",
+					"resource.type": "index_or_alias",
+					"resource.id":   indexExpression,
+					"index_uuid":    "_na_",
+					"index":         indexExpression,
+				},
+				"status": 404,
+			},
+		})
+		return
+	}
 	shardRouting := cluster.GetShards(*clusterState, indexName, documentId).Primary
 	getRequest := getRequest{
 		Index:   indexName,
 		Id:      documentId,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
 		res := getResponseFromBytes(response)
 		if res.Err != "" {
 			logrus.Warn(errors.New(res.Err))
@@ -359,7 +384,6 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 			})
 		}
 	})
-
 }
 
 type deleteRequest struct {
@@ -435,7 +459,7 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 		ShardId: shardRouting.ShardId,
 	}
 
-	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], DeleteAction, deleteRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], DeleteAction, deleteRequest.toBytes(), func(response []byte) {
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -453,13 +477,5 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 				"_primary_term": 1,
 			},
 		})
-	})
-}
-
-type RestHeadDoc struct{}
-
-func (h *RestHeadDoc) Handle(r *RestRequest, reply ResponseListener) {
-	reply(RestResponse{
-		StatusCode: 200,
 	})
 }

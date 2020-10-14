@@ -184,9 +184,9 @@ type Index struct {
 }
 
 type IndexMetadata struct {
-	Index            Index
-	RoutingNumShards int
-	//RoutingNumReplicas int
+	Index          Index
+	NumberOfShards int
+	//NumberOfReplicas int
 	//Version            int64
 	//State              IndexMetadataState
 	Aliases map[string]AliasMetadata

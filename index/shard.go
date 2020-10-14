@@ -94,3 +94,20 @@ func (s *Shard) Search(searchRequest *bleve.SearchRequest) (*bleve.SearchResult,
 	}
 	return searchResult, nil
 }
+
+func (s *Shard) Stats() *Stats {
+	statsMap := s.engine.StatsMap()
+	numDocs, err := s.engine.DocCount()
+	if err != nil {
+		logrus.Fatalln(err)
+	}
+	return &Stats{
+		UserData: statsMap,
+		NumDocs:  numDocs,
+	}
+}
+
+type Stats struct {
+	UserData map[string]interface{}
+	NumDocs  uint64
+}

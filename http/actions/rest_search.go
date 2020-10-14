@@ -161,7 +161,7 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 	}
 	clusterState := h.clusterService.State()
 	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
-	shardNum := clusterState.Metadata.Indices[indexName].RoutingNumShards
+	shardNum := clusterState.Metadata.Indices[indexName].NumberOfShards
 
 	totalResults := make(chan SearchResultData, shardNum)
 
@@ -171,7 +171,7 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			ShardId:     shardRouting.ShardId,
 			SearchBody:  body,
 		}
-		h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.Primary.CurrentNodeId], SearchAction, req.toBytes(), func(response []byte) {
+		h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.Primary.CurrentNodeId], SearchAction, req.toBytes(), func(response []byte) {
 			totalResults <- SearchResponseFromBytes(response).SearchResult
 		})
 	}

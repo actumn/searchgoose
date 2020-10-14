@@ -48,8 +48,8 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 			Name: req.Index,
 			Uuid: common.RandomBase64(),
 		},
-		RoutingNumShards: routingNumShards,
-		Aliases:          map[string]state.AliasMetadata{},
+		NumberOfShards: routingNumShards,
+		Aliases:        map[string]state.AliasMetadata{},
 		Mapping: map[string]state.MappingMetadata{
 			"_doc": {
 				Type:   "_doc",
@@ -70,7 +70,7 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 
 	// regenerate routing table using indexMetadata
 	shards := map[int]state.IndexShardRoutingTable{}
-	for shardNumber := 0; shardNumber < indexMetadata.RoutingNumShards; shardNumber++ {
+	for shardNumber := 0; shardNumber < indexMetadata.NumberOfShards; shardNumber++ {
 		shards[shardNumber] = state.IndexShardRoutingTable{
 			ShardId: state.ShardId{
 				Index:   indexMetadata.Index,
