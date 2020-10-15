@@ -57,6 +57,7 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 		Indices: map[string]state.IndexMetadata{
 			indexMetadata.Index.Name: indexMetadata,
 		},
+		IndicesLookup: map[string]state.IndexAbstractionAlias{},
 	}
 	for k, v := range current.Metadata.Indices {
 		metadata.Indices[k] = v

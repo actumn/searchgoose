@@ -80,6 +80,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		}
 
 		handler.Handle(&request, func(response actions.RestResponse) {
+			logrus.Info("reply on ", ctx.Method(), " ", request.Path)
 			ctx.Response.SetStatusCode(response.StatusCode)
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			if err := json.NewEncoder(ctx).Encode(response.Body); err != nil {
@@ -135,12 +136,12 @@ func New(
 		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
-		actions.POST: actions.NewRestIndexDoc(clusterService, indicesService, transportService),
+		actions.POST: actions.NewRestIndexDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, transportService),
-		actions.PUT:    actions.NewRestIndexDocId(clusterService, indicesService, transportService),
-		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, transportService),
+		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.PUT:    actions.NewRestIndexDocId(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 		actions.HEAD:   &actions.RestHeadDoc{},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{

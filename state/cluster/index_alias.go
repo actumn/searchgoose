@@ -44,5 +44,15 @@ func (s *MetadataIndexAliasService) applyAliasesAction(current state.ClusterStat
 			logrus.Fatal("Unknown action: ", action.Type)
 		}
 	}
+
+	for _, indexMetadata := range current.Metadata.Indices {
+		for _, aliasMetadata := range indexMetadata.Aliases {
+			current.Metadata.IndicesLookup[indexMetadata.Index.Name] = state.IndexAbstractionAlias{
+				AliasName:  aliasMetadata.Alias,
+				WriteIndex: indexMetadata,
+			}
+		}
+	}
+
 	return current
 }

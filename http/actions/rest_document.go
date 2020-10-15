@@ -49,12 +49,13 @@ type indexResponse struct {
 }
 
 type RestIndexDoc struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDoc {
+func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDoc {
 	// Handle primary shard request
 	transportService.RegisterRequestHandler(IndexAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("indexAction on primary shard")
@@ -76,9 +77,10 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 	})
 
 	return &RestIndexDoc{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
@@ -129,17 +131,19 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type RestIndexDocId struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestIndexDocId(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDocId {
+func NewRestIndexDocId(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDocId {
 	// Handle primary shard request
 	return &RestIndexDocId{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
@@ -241,12 +245,13 @@ func getResponseFromBytes(b []byte) *getResponse {
 }
 
 type RestGetDoc struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestGetDoc {
+func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestGetDoc {
 	transportService.RegisterRequestHandler(GetAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("getAction on shard")
 		request := getRequestFromBytes(req)
@@ -272,9 +277,10 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 	})
 
 	return &RestGetDoc{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
@@ -347,12 +353,13 @@ type deleteResponse struct {
 }
 
 type RestDeleteDoc struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestDeleteDoc {
+func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestDeleteDoc {
 	transportService.RegisterRequestHandler(DeleteAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("deleteAction on primary shard")
 		request := deleteRequestFromBytes(req)
@@ -369,9 +376,10 @@ func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.S
 	})
 
 	return &RestDeleteDoc{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 

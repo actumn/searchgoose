@@ -142,6 +142,7 @@ type Metadata struct {
 	//Coordination CoordinationMetadata
 	Indices map[string]IndexMetadata
 	//Templates    map[string]IndexTemplateMetadata
+	IndicesLookup map[string]IndexAbstractionAlias
 }
 
 func (m *Metadata) FindAliases(aliases []string, concreteIndices []string) map[string][]AliasMetadata {
@@ -248,4 +249,9 @@ type ShardRouting struct {
 	CurrentNodeId string
 	//RelocatingNodeId string
 	Primary bool
+}
+
+type IndexAbstractionAlias struct {
+	AliasName  string
+	WriteIndex IndexMetadata
 }
