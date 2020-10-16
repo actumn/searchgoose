@@ -80,11 +80,11 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		}
 
 		handler.Handle(&request, func(response actions.RestResponse) {
-			logrus.Info("reply on ", ctx.Method(), " ", request.Path)
+			logrus.Debug("reply on ", string(ctx.Method()), " ", request.Path)
 			ctx.Response.SetStatusCode(response.StatusCode)
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			if err := json.NewEncoder(ctx).Encode(response.Body); err != nil {
-				logrus.Info(err)
+				logrus.Error(err)
 			}
 		})
 		return
@@ -145,7 +145,7 @@ func New(
 		actions.HEAD:   &actions.RestHeadDoc{},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
-		actions.GET: actions.NewRestSearch(clusterService, indicesService, transportService),
+		actions.GET: actions.NewRestSearch(clusterService, indicesService, indexNameExpressionResolver, transportService),
 	})
 	c.pathTrie.insert("/{index}/_refresh", actions.MethodHandlers{
 		actions.GET:  actions.NewRestRefresh(clusterService),

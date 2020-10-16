@@ -37,23 +37,31 @@ func (r *NameExpressionResolver) ConcreteIndexNames(clusterState state.ClusterSt
 	return indexResult
 }
 
+func (r *NameExpressionResolver) ConcreteSingleIndex(clusterState state.ClusterState, expression string) state.Index {
+	return r.ConcreteIndices(clusterState, expression)[0]
+}
+
 func (r *NameExpressionResolver) ConcreteIndices(clusterState state.ClusterState, expression string) []state.Index {
-	var indiceResult []state.Index
+	var indicesResult []state.Index
 
 	if strings.HasSuffix(expression, "*") {
 		trimmedExpression := strings.TrimSuffix(expression, "*")
 		for k, v := range clusterState.Metadata.Indices {
 			if strings.HasPrefix(k, trimmedExpression) {
-				indiceResult = append(indiceResult, v.Index)
+				indicesResult = append(indicesResult, v.Index)
 			}
 		}
 	} else {
 		for k, v := range clusterState.Metadata.Indices {
 			if strings.HasPrefix(k, expression) {
-				indiceResult = append(indiceResult, v.Index)
+				indicesResult = append(indicesResult, v.Index)
 			}
 		}
 	}
 
-	return indiceResult
+	if indexAbstraction, existing := clusterState.Metadata.IndicesLookup[expression]; existing {
+		indicesResult = append(indicesResult, indexAbstraction.WriteIndex.Index)
+	}
+
+	return indicesResult
 }

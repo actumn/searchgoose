@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"github.com/actumn/searchgoose/common"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
@@ -45,7 +46,7 @@ func indexRequestFromBytes(b []byte) *indexRequest {
 }
 
 type indexResponse struct {
-	Err error
+	Err string
 }
 
 type RestIndexDoc struct {
@@ -85,7 +86,7 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 }
 
 func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := common.RandomBase64()
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
@@ -101,6 +102,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 
 	// TODO :: auto create index if absent.
 	clusterState := h.clusterService.State()
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
@@ -148,7 +150,7 @@ func NewRestIndexDocId(clusterService *cluster.Service, indicesService *indices.
 }
 
 func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
@@ -164,7 +166,8 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 
 	// TODO :: auto create index if absent.
 	clusterState := h.clusterService.State()
-	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
+	shardRouting := cluster.IndexShard(*clusterState, indexExpression, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
 		Id:      documentId,
@@ -222,7 +225,7 @@ type getResponse struct {
 	Id      string
 	ShardId state.ShardId
 	Fields  map[string]interface{}
-	Err     error
+	Err     string
 }
 
 func (r *getResponse) toBytes() []byte {
@@ -262,7 +265,7 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 		if doc, err := indexShard.Get(request.Id); err != nil {
 			logrus.Warn(err)
 			res := getResponse{
-				Err: err,
+				Err: err.Error(),
 			}
 			channel.SendMessage("", res.toBytes())
 		} else {
@@ -285,10 +288,11 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 }
 
 func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 
 	clusterState := h.clusterService.State()
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
 	shardRouting := cluster.GetShards(*clusterState, indexName, documentId).Primary
 	getRequest := getRequest{
 		Index:   indexName,
@@ -297,11 +301,15 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 	}
 	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
 		res := getResponseFromBytes(response)
-		if res.Err != nil {
+		if res.Err != "" {
+			logrus.Warn(errors.New(res.Err))
 			reply(RestResponse{
 				StatusCode: 400,
 				Body: map[string]interface{}{
-					"err": res.Err,
+					"_index": indexName,
+					"_type":  "_doc",
+					"_id":    documentId,
+					"found":  res.Err,
 				},
 			})
 		} else {
@@ -349,7 +357,7 @@ func deleteRequestFromBytes(b []byte) *deleteRequest {
 }
 
 type deleteResponse struct {
-	Err error
+	Err string
 }
 
 type RestDeleteDoc struct {
@@ -384,10 +392,11 @@ func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.S
 }
 
 func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 
 	clusterState := h.clusterService.State()
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	deleteRequest := deleteRequest{
 		Index:   indexName,
