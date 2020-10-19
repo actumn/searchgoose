@@ -12,7 +12,7 @@ func NewRoutingNodes(clusterState ClusterState) *RoutingNodes {
 	for id, node := range clusterState.Nodes.DataNodes {
 		nodesToShards[id] = &RoutingNode{
 			NodeId:        id,
-			node:          node,
+			node:          &node,
 			Shards:        map[ShardId]ShardRouting{},
 			ShardsByIndex: map[string]map[ShardRouting]struct{}{},
 		}

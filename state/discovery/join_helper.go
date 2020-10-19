@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/transport"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 type JoinHelper struct {
@@ -32,8 +32,8 @@ func NewJoinHelper(
 
 func (h *JoinHelper) SendStartJoinRequest(startJoinRequest StartJoinRequest, destination state.Node) {
 	request := startJoinRequest.ToBytes()
-	h.transportService.SendRequest(destination, transport.START_JOIN, request, func(res []byte) {
-		log.Printf("Successful response to %v from %v\n", startJoinRequest, destination)
+	h.transportService.SendRequest(destination, transport.START_JOIN_REQ, request, func(res []byte) {
+		logrus.Infof("StartJoinRequest : successful response to %v from %v\n", startJoinRequest, destination)
 	})
 }
 
@@ -56,18 +56,23 @@ func (h *JoinHelper) SendJoinRequest(destination state.Node, term int64, join *s
 		Join:        *join,
 	}
 
-	log.Printf("Attempting to join %v with %v\n", destination, joinRequest)
+	logrus.Infof("SendJoinRequest: Attempting to join %v with %v\n", destination, joinRequest)
 
 	request := joinRequest.ToBytes()
 
 	remoteAddress := destination.HostAddress
 	if h.transportService.IsConnected(remoteAddress) == false {
-		h.transportService.ConnectToRemoteNode(remoteAddress, func(node *state.Node) {})
+		h.transportService.ConnectToRemoteNode(remoteAddress, func(node *state.Node) {
+			h.transportService.SendRequest(*node, transport.JOIN_REQ, request, func(res []byte) {
+				logrus.Infof("Successfully joined %v with %v\n", destination, joinRequest)
+			})
+		})
+	} else {
+		h.transportService.SendRequest(destination, transport.JOIN_REQ, request, func(res []byte) {
+			logrus.Infof("Successfully joined %v with %v\n", destination, joinRequest)
+		})
 	}
 
-	h.transportService.SendRequest(destination, transport.JOIN_REQ, request, func(res []byte) {
-		log.Printf("Successfully joined %v with %v\n", destination, joinRequest)
-	})
 }
 
 type JoinAccumulator interface {
@@ -94,7 +99,7 @@ func (r *StartJoinRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -104,7 +109,7 @@ func StartJoinRequestFromBytes(b []byte) *StartJoinRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data StartJoinRequest
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &data
 }
@@ -119,7 +124,7 @@ func (r *JoinRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
 }
@@ -129,7 +134,7 @@ func JoinRequestFromBytes(b []byte) *JoinRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data JoinRequest
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatal(err)
 	}
 	return &data
 }

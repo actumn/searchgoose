@@ -168,7 +168,7 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 			ShardId:     shardRouting.ShardId,
 			SearchBody:  body,
 		}
-		h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.Primary.CurrentNodeId], SearchAction, req.toBytes(), func(response []byte) {
+		h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.Primary.CurrentNodeId], SearchAction, req.toBytes(), func(response []byte) {
 			totalResults <- SearchResponseFromBytes(response).SearchResult
 		})
 	}

@@ -6,8 +6,8 @@ import (
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
 	"io"
-	"log"
 	"net"
+	"strings"
 )
 
 type Transport struct {
@@ -31,11 +31,11 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 		Action:  action,
 		Content: content,
 	}
-	log.Printf("Send %s to %s\n", request.Action, request.Dest)
+	logrus.Infof("Send %s to %s\n", request.Action, request.Dest)
 
 	_, err := c.conn.Write(request.ToBytes())
 	if err != nil {
-		logrus.Printf("Fail to send request; err:%v\n", err)
+		logrus.Infof("Fail to send request; err:%v\n", err)
 	}
 	go func() {
 		recvBuf := make([]byte, 4096)
@@ -46,8 +46,12 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 			return
 		}
 		response := DataFormatFromBytes(recvBuf[:n])
-		logrus.Printf("Receive %s from %s\n", response.Action, response.Source)
-		callback(response.Content)
+		logrus.Infof("Receive %s from %s\n", response.Action, response.Source)
+		if strings.Contains(response.Action, "_FAIL") {
+			logrus.Infof("Error: %s", string(response.Content))
+		} else {
+			callback(response.Content)
+		}
 	}()
 }
 
@@ -116,34 +120,26 @@ func (t *Transport) Start(address string) {
 				continue
 			}
 			go func(conn net.Conn) {
-				recvBuf := make([]byte, 4096)
-				n, err := conn.Read(recvBuf)
-				if err != nil {
-					if io.EOF == err {
-						logrus.Info("connection is closed from client; %v", conn.RemoteAddr().String())
-						return
-					}
-					logrus.Info("Fail to receive data; err: %v", err)
-					return
-				}
-				if 0 < n {
-					for {
-						recvBuf := make([]byte, 4096)
-						n, err := conn.Read(recvBuf)
-						if err != nil {
-							if io.EOF == err {
-								log.Printf("connection is closed from client; %v", conn.RemoteAddr().String())
-								return
-							}
-							log.Printf("Fail to receive data; err: %v", err)
+				for {
+					recvBuf := make([]byte, 4096)
+					n, err := conn.Read(recvBuf)
+					if err != nil {
+						if io.EOF == err {
+							logrus.Infof("Connection is closed from client; %v", conn.RemoteAddr().String())
 							return
 						}
-						if 0 < n {
-							// Receive request data
-							recvData := DataFormatFromBytes(recvBuf[:n])
-							action := recvData.Action
-							data := recvData.Content
+						logrus.Infof("Fail to receive data; err: %v", err)
+						return
+					}
+					if 0 < n {
+						// Receive request data
+						recvData := DataFormatFromBytes(recvBuf[:n])
+						action := recvData.Action
+						data := recvData.Content
 
+						if strings.Contains(action, "_FAIL") {
+							logrus.Fatalf("Error: %s", string(data))
+						} else {
 							t.RequestHandlers[action](&ReplyChannel{
 								conn:         conn,
 								localAddress: t.LocalAddress,
@@ -196,7 +192,7 @@ func (d *DataFormat) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(d); err != nil {
-		log.Fatalln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -206,7 +202,7 @@ func DataFormatFromBytes(b []byte) *DataFormat {
 	decoder := gob.NewDecoder(buffer)
 	var data DataFormat
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }

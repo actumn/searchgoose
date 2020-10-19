@@ -106,7 +106,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		Source:  r.Body,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
 		logrus.Info("callback success")
 		reply(RestResponse{
 			StatusCode: 200,
@@ -167,7 +167,7 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 		Source:  r.Body,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -289,7 +289,7 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 		Id:      documentId,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
 		res := getResponseFromBytes(response)
 		if res.Err != nil {
 			reply(RestResponse{
@@ -387,7 +387,7 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 		ShardId: shardRouting.ShardId,
 	}
 
-	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], DeleteAction, deleteRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], DeleteAction, deleteRequest.toBytes(), func(response []byte) {
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
