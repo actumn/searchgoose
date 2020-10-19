@@ -136,16 +136,17 @@ func New(
 		actions.HEAD:   &actions.RestHeadIndex{},
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
-		actions.POST: actions.NewRestIndexDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.POST: actions.NewRestIndexDoc(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
 		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
-		actions.PUT:    actions.NewRestIndexDocId(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.PUT:    actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 		actions.HEAD:   &actions.RestHeadDoc{},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
-		actions.GET: actions.NewRestSearch(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.GET:  actions.NewRestSearch(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.POST: actions.NewRestSearch(clusterService, indicesService, indexNameExpressionResolver, transportService),
 	})
 	c.pathTrie.insert("/{index}/_refresh", actions.MethodHandlers{
 		actions.GET:  actions.NewRestRefresh(clusterService),

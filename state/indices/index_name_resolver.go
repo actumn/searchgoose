@@ -38,7 +38,11 @@ func (r *NameExpressionResolver) ConcreteIndexNames(clusterState state.ClusterSt
 }
 
 func (r *NameExpressionResolver) ConcreteSingleIndex(clusterState state.ClusterState, expression string) state.Index {
-	return r.ConcreteIndices(clusterState, expression)[0]
+	if indices := r.ConcreteIndices(clusterState, expression); len(indices) == 0 {
+		return state.Index{}
+	} else {
+		return indices[0]
+	}
 }
 
 func (r *NameExpressionResolver) ConcreteIndices(clusterState state.ClusterState, expression string) []state.Index {

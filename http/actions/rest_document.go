@@ -51,12 +51,13 @@ type indexResponse struct {
 
 type RestIndexDoc struct {
 	clusterService              *cluster.Service
+	createIndexService          *cluster.MetadataCreateIndexService
 	indicesService              *indices.Service
 	indexNameExpressionResolver *indices.NameExpressionResolver
 	transportService            *transport.Service
 }
 
-func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDoc {
+func NewRestIndexDoc(clusterService *cluster.Service, createIndexService *cluster.MetadataCreateIndexService, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDoc {
 	// Handle primary shard request
 	transportService.RegisterRequestHandler(IndexAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("indexAction on primary shard")
@@ -79,6 +80,7 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 
 	return &RestIndexDoc{
 		clusterService:              clusterService,
+		createIndexService:          createIndexService,
 		indicesService:              indicesService,
 		indexNameExpressionResolver: indexNameExpressionResolver,
 		transportService:            transportService,
@@ -100,9 +102,21 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 
-	// TODO :: auto create index if absent.
 	clusterState := h.clusterService.State()
 	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
+	if indexName == "" {
+		req := cluster.CreateIndexClusterStateUpdateRequest{
+			Index:    indexExpression,
+			Mappings: []byte(`{ "properties": {} }`),
+			Settings: map[string]interface{}{
+				"number_of_shards": 1.0,
+			},
+		}
+		// TODO :: refactor to callback function to execute after create
+		// TODO :: index dynamic mapping
+		h.createIndexService.CreateIndex(req)
+		indexName = indexExpression
+	}
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
@@ -134,15 +148,17 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 
 type RestIndexDocId struct {
 	clusterService              *cluster.Service
+	createIndexService          *cluster.MetadataCreateIndexService
 	indicesService              *indices.Service
 	indexNameExpressionResolver *indices.NameExpressionResolver
 	transportService            *transport.Service
 }
 
-func NewRestIndexDocId(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDocId {
+func NewRestIndexDocId(clusterService *cluster.Service, createIndexService *cluster.MetadataCreateIndexService, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDocId {
 	// Handle primary shard request
 	return &RestIndexDocId{
 		clusterService:              clusterService,
+		createIndexService:          createIndexService,
 		indicesService:              indicesService,
 		indexNameExpressionResolver: indexNameExpressionResolver,
 		transportService:            transportService,
@@ -164,9 +180,21 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 
-	// TODO :: auto create index if absent.
 	clusterState := h.clusterService.State()
 	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
+	if indexName == "" {
+		req := cluster.CreateIndexClusterStateUpdateRequest{
+			Index:    indexExpression,
+			Mappings: []byte(`{ "properties": {} }`),
+			Settings: map[string]interface{}{
+				"number_of_shards": 1.0,
+			},
+		}
+		// TODO :: refactor to callback function to execute after create
+		// TODO :: index dynamic mapping
+		h.createIndexService.CreateIndex(req)
+		indexName = indexExpression
+	}
 	shardRouting := cluster.IndexShard(*clusterState, indexExpression, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
