@@ -85,7 +85,6 @@ func (h *RestGetIndex) Handle(r *RestRequest, reply ResponseListener) {
 		StatusCode: 200,
 		Body:       response,
 	})
-
 }
 
 type RestPutIndex struct {
@@ -176,10 +175,34 @@ func (h *RestDeleteIndex) Handle(r *RestRequest, reply ResponseListener) {
 	})
 }
 
-type RestHeadIndex struct{}
+type RestHeadIndex struct {
+	clusterService              *cluster.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+}
+
+func NewRestHeadIndex(clusterService *cluster.Service, indexNameExpressionResolver *indices.NameExpressionResolver) *RestHeadIndex {
+	return &RestHeadIndex{
+		clusterService:              clusterService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+	}
+}
 
 func (h *RestHeadIndex) Handle(r *RestRequest, reply ResponseListener) {
+	// TODO:: forward to master if local node is data node
+	//indicesExpressions := strings.Split(, ",")
+	indexExpression := r.PathParams["index"]
+	clusterState := h.clusterService.State()
+	indexNames := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, indexExpression)
+	if !strings.Contains(indexExpression, "*") && len(indexNames) == 0 {
+		reply(RestResponse{
+			StatusCode: 404,
+			Body:       "",
+		})
+		return
+	}
+
 	reply(RestResponse{
 		StatusCode: 200,
+		Body:       "",
 	})
 }

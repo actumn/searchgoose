@@ -133,7 +133,7 @@ func New(
 		actions.GET:    actions.NewRestGetIndex(clusterService, indexNameExpressionResolver),
 		actions.PUT:    actions.NewRestPutIndex(clusterMetadataCreateIndexService),
 		actions.DELETE: actions.NewRestDeleteIndex(clusterService, indexNameExpressionResolver, clusterMetadataDeleteIndexService),
-		actions.HEAD:   &actions.RestHeadIndex{},
+		actions.HEAD:   actions.NewRestHeadIndex(clusterService, indexNameExpressionResolver),
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
 		actions.POST: actions.NewRestIndexDoc(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
