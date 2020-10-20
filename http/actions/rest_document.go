@@ -116,6 +116,8 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		// TODO :: index dynamic mapping
 		h.createIndexService.CreateIndex(req)
 		indexName = indexExpression
+		clusterState = h.clusterService.State()
+
 	}
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
@@ -194,6 +196,7 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 		// TODO :: index dynamic mapping
 		h.createIndexService.CreateIndex(req)
 		indexName = indexExpression
+		clusterState = h.clusterService.State()
 	}
 	shardRouting := cluster.IndexShard(*clusterState, indexExpression, documentId).Primary
 	indexRequest := indexRequest{

@@ -94,56 +94,101 @@ func SearchTypeNumericRange(searchType interface{}) *query.ConjunctionQuery {
 	return bleve.NewConjunctionQuery(gtQuery, ltQuery)
 }
 
+func SearchTypeSimpleQueryString(searchType interface{}) *query.QueryStringQuery {
+	m := searchType.(map[string]interface{})
+	var message string
+	if k, found := m["query"]; found {
+		message = k.(string)
+	}
+
+	return bleve.NewQueryStringQuery(message)
+}
+
 func SearchTypeBool(searchType interface{}) *query.BooleanQuery {
 	m := searchType.(map[string]interface{})
 	searchQuery := bleve.NewBooleanQuery()
 	var mustSearch, mustNotSearch, shouldSearch map[string]interface{}
 	for key, value := range m {
-		if key == "must" {
-			mustSearch = value.(map[string]interface{})
-		} else if key == "must_not" {
-			mustNotSearch = value.(map[string]interface{})
-		} else if key == "should" {
-			shouldSearch = value.(map[string]interface{})
+		fmt.Println(strings.ToUpper(key))
+		switch key {
+		case "must", "filter":
+			queryMap, ok := value.([]interface{})
+			if ok {
+				mustSearch = queryMap[0].(map[string]interface{})
+			} else {
+				mustSearch = value.(map[string]interface{})
+			}
+		case "must_not":
+			queryMap, ok := value.([]interface{})
+			if ok {
+				mustNotSearch = queryMap[0].(map[string]interface{})
+			} else {
+				mustNotSearch = value.(map[string]interface{})
+			}
+		case "should":
+			queryMap, ok := value.([]interface{})
+			if ok {
+				shouldSearch = queryMap[0].(map[string]interface{})
+			} else {
+				shouldSearch = value.(map[string]interface{})
+			}
 		}
 	}
 	for key, value := range mustSearch {
-		if key == "match" {
+		fmt.Println(strings.ToUpper(key))
+		switch key {
+		case "match", "term":
 			searchQuery.AddMust(SearchTypeMatch(value))
-		} else if key == "match_phrase" {
+		case "match_phrase":
 			searchQuery.AddMust(SearchTypeMatchPhrase(value))
-		} else if key == "prefix" {
+		case "prefix":
 			searchQuery.AddMust(SearchTypePrefix(value))
-		} else if key == "fuzzy" {
+		case "fuzzy":
 			searchQuery.AddMust(SearchTypeFuzzy(value))
-		} else if key == "range" {
+		case "range":
 			searchQuery.AddMust(SearchTypeNumericRange(value))
+		case "bool":
+			searchQuery.AddMust(SearchTypeBool(value))
+		case "simple_query_string":
+			searchQuery.AddMust(SearchTypeSimpleQueryString(value))
 		}
 	}
 	for key, value := range mustNotSearch {
-		if key == "match" {
+		fmt.Println(strings.ToUpper(key))
+		switch key {
+		case "match", "term":
 			searchQuery.AddMustNot(SearchTypeMatch(value))
-		} else if key == "match_phrase" {
+		case "match_phrase":
 			searchQuery.AddMustNot(SearchTypeMatchPhrase(value))
-		} else if key == "prefix" {
+		case "prefix":
 			searchQuery.AddMustNot(SearchTypePrefix(value))
-		} else if key == "fuzzy" {
+		case "fuzzy":
 			searchQuery.AddMustNot(SearchTypeFuzzy(value))
-		} else if key == "range" {
+		case "range":
 			searchQuery.AddMustNot(SearchTypeNumericRange(value))
+		case "bool":
+			searchQuery.AddMustNot(SearchTypeBool(value))
+		case "simple_query_string":
+			searchQuery.AddMustNot(SearchTypeSimpleQueryString(value))
 		}
 	}
 	for key, value := range shouldSearch {
-		if key == "match" {
+		fmt.Println(strings.ToUpper(key))
+		switch key {
+		case "match", "term":
 			searchQuery.AddShould(SearchTypeMatch(value))
-		} else if key == "match_phrase" {
+		case "match_phrase":
 			searchQuery.AddShould(SearchTypeMatchPhrase(value))
-		} else if key == "prefix" {
+		case "prefix":
 			searchQuery.AddShould(SearchTypePrefix(value))
-		} else if key == "fuzzy" {
+		case "fuzzy":
 			searchQuery.AddShould(SearchTypeFuzzy(value))
-		} else if key == "range" {
+		case "range":
 			searchQuery.AddShould(SearchTypeNumericRange(value))
+		case "bool":
+			searchQuery.AddShould(SearchTypeBool(value))
+		case "simple_query_string":
+			searchQuery.AddShould(SearchTypeSimpleQueryString(value))
 		}
 	}
 	return searchQuery
