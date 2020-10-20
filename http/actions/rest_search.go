@@ -19,9 +19,10 @@ const (
 )
 
 type RestSearch struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
 type SearchRequest struct {
@@ -79,7 +80,7 @@ func SearchResponseFromBytes(b []byte) *SearchResponse {
 	return &req
 }
 
-func NewRestSearch(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestSearch {
+func NewRestSearch(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestSearch {
 	transportService.RegisterRequestHandler(SearchAction, func(channel transport.ReplyChannel, req []byte) {
 		request := SearchRequestFromBytes(req)
 		indexName := request.SearchIndex
@@ -144,20 +145,22 @@ func NewRestSearch(clusterService *cluster.Service, indicesService *indices.Serv
 	})
 
 	return &RestSearch{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
 func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
 		logrus.Fatal(err)
 	}
 	clusterState := h.clusterService.State()
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
 	shardNum := clusterState.Metadata.Indices[indexName].RoutingNumShards
 
 	totalResults := make(chan SearchResultData, shardNum)

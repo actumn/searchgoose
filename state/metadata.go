@@ -142,6 +142,40 @@ type Metadata struct {
 	//Coordination CoordinationMetadata
 	Indices map[string]IndexMetadata
 	//Templates    map[string]IndexTemplateMetadata
+	IndicesLookup map[string]IndexAbstractionAlias
+}
+
+func (m *Metadata) FindAliases(aliases []string, concreteIndices []string) map[string][]AliasMetadata {
+	if len(concreteIndices) == 0 {
+		return map[string][]AliasMetadata{}
+	}
+
+	var patterns []string
+	for _, alias := range aliases {
+		patterns = append(patterns, alias)
+	}
+
+	result := map[string][]AliasMetadata{}
+	for _, index := range concreteIndices {
+		indexMetadata := m.Indices[index]
+		var filteredValues []AliasMetadata
+		for _, value := range indexMetadata.Aliases {
+			matched := false
+			alias := value.Alias
+			for _, pattern := range patterns {
+				matched = pattern == alias
+			}
+
+			if matched {
+				filteredValues = append(filteredValues, value)
+			}
+		}
+
+		if len(filteredValues) > 0 {
+			result[index] = filteredValues
+		}
+	}
+	return result
 }
 
 type Index struct {
@@ -155,8 +189,13 @@ type IndexMetadata struct {
 	//RoutingNumReplicas int
 	//Version            int64
 	//State              IndexMetadataState
+	Aliases map[string]AliasMetadata
 	Mapping map[string]MappingMetadata
 	//Settings Settings
+}
+
+type AliasMetadata struct {
+	Alias string
 }
 
 /*
@@ -210,4 +249,9 @@ type ShardRouting struct {
 	CurrentNodeId string
 	//RelocatingNodeId string
 	Primary bool
+}
+
+type IndexAbstractionAlias struct {
+	AliasName  string
+	WriteIndex IndexMetadata
 }
