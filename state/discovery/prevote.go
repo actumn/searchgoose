@@ -6,12 +6,14 @@ import (
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
-	"log"
+	"sync"
 )
 
 type PreVoteCollector struct {
-	state           map[state.Node]*PreVoteResponse //tuple
-	preVotes        map[state.Node]*PreVoteResponse //map
+	state     map[state.Node]*PreVoteResponse //tuple
+	preVotes  map[state.Node]*PreVoteResponse //map
+	wirteLock sync.RWMutex
+
 	electionStarted bool
 
 	transportService  *transport.Service
@@ -82,7 +84,7 @@ func (p *PreVoteCollector) handlePreVoteRequest(channel transport.ReplyChannel, 
 
 func (p *PreVoteCollector) handlePreVoteResponse(response *PreVoteResponse, sender state.Node) {
 	p.updateMaxTermSeen(response.CurrentTerm)
-	p.preVotes[sender] = response
+	p.SetVote(sender, response)
 
 	voteCollection := state.NewVoteCollection()
 	localNode := p.transportService.GetLocalNode()
@@ -126,6 +128,12 @@ func (p *PreVoteCollector) update(preVoteResponse *PreVoteResponse, leader state
 	}
 	logrus.Infof("Updating with preVoteResponse=%v, leader=%v\n", preVoteResponse, leader)
 
+}
+
+func (p *PreVoteCollector) SetVote(key state.Node, value *PreVoteResponse) {
+	p.wirteLock.Lock()
+	p.preVotes[key] = value
+	p.wirteLock.Unlock()
 }
 
 func (p *PreVoteCollector) getLeader() state.Node {
@@ -190,7 +198,7 @@ func (p *PreVoteResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(p); err != nil {
-		log.Fatalln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -200,7 +208,7 @@ func PreVoteResponseFromBytes(b []byte) *PreVoteResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data PreVoteResponse
 	if err := decoder.Decode(&data); err != nil {
-		log.Fatalln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }
