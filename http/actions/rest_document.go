@@ -117,7 +117,6 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		h.createIndexService.CreateIndex(req)
 		indexName = indexExpression
 		clusterState = h.clusterService.State()
-
 	}
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
@@ -324,6 +323,33 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 
 	clusterState := h.clusterService.State()
 	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
+	if indexName == "" {
+		reply(RestResponse{
+			StatusCode: 404,
+			Body: map[string]interface{}{
+				"error": map[string]interface{}{
+					"root_cause": []map[string]interface{}{
+						{
+							"type":          "index_not_found_exception",
+							"reason":        "no such index [" + indexExpression + "]",
+							"resource.type": "index_or_alias",
+							"resource.id":   ".kibana",
+							"index_uuid":    "_na_",
+							"index":         ".kibana",
+						},
+					},
+					"type":          "index_not_found_exception",
+					"reason":        "no such index [" + indexExpression + "]",
+					"resource.type": "index_or_alias",
+					"resource.id":   indexExpression,
+					"index_uuid":    "_na_",
+					"index":         indexExpression,
+				},
+				"status": 404,
+			},
+		})
+		return
+	}
 	shardRouting := cluster.GetShards(*clusterState, indexName, documentId).Primary
 	getRequest := getRequest{
 		Index:   indexName,
@@ -359,7 +385,6 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 			})
 		}
 	})
-
 }
 
 type deleteRequest struct {
@@ -453,13 +478,5 @@ func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
 				"_primary_term": 1,
 			},
 		})
-	})
-}
-
-type RestHeadDoc struct{}
-
-func (h *RestHeadDoc) Handle(r *RestRequest, reply ResponseListener) {
-	reply(RestResponse{
-		StatusCode: 200,
 	})
 }

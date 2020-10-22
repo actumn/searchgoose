@@ -16,7 +16,7 @@ func (h *RestRefresh) Handle(r *RestRequest, reply ResponseListener) {
 	// TODO:: boradcast request and reply appropriate response
 	index := r.PathParams["index"]
 	clusterState := h.clusterService.State()
-	shardCount := clusterState.Metadata.Indices[index].RoutingNumShards
+	shardCount := clusterState.Metadata.Indices[index].NumberOfShards
 	reply(RestResponse{
 		StatusCode: 200,
 		Body: map[string]interface{}{

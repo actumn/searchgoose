@@ -26,11 +26,14 @@ func (h *RestGetIndex) Handle(r *RestRequest, reply ResponseListener) {
 	// TODO:: forward to master if local node is data node
 	//indicesExpressions := strings.Split(, ",")
 	indexExpression := r.PathParams["index"]
+	if indexExpression == "_all" {
+		indexExpression = "*"
+	}
 	clusterState := h.clusterService.State()
 	indexNames := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, indexExpression)
 	if !strings.Contains(indexExpression, "*") && len(indexNames) == 0 {
 		reply(RestResponse{
-			StatusCode: 200,
+			StatusCode: 404,
 			Body: map[string]interface{}{
 				"error": map[string]interface{}{
 					"root_cause": []map[string]interface{}{
@@ -64,13 +67,17 @@ func (h *RestGetIndex) Handle(r *RestRequest, reply ResponseListener) {
 			logrus.Fatal(err)
 		}
 
+		aliases := map[string]interface{}{}
+		for _, alias := range index.Aliases {
+			aliases[alias.Alias] = map[string]interface{}{}
+		}
 		response[indexName] = map[string]interface{}{
-			"aliases":  map[string]interface{}{},
+			"aliases":  aliases,
 			"mappings": mappings,
 			"settings": map[string]interface{}{
 				"index": map[string]interface{}{
 					"creation_date":      "1597382566866",
-					"number_of_shards":   strconv.Itoa(index.RoutingNumShards),
+					"number_of_shards":   strconv.Itoa(index.NumberOfShards),
 					"number_of_replicas": "0",
 					"uuid":               index.Index.Uuid,
 					"version": map[string]interface{}{

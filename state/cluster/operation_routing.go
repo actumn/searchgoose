@@ -7,7 +7,7 @@ import (
 
 func IndexShard(clusterState state.ClusterState, index string, id string) state.IndexShardRoutingTable {
 	indexMetadata := clusterState.Metadata.Indices[index]
-	shardId := common.MurMur3Hash(id) % indexMetadata.RoutingNumShards
+	shardId := common.MurMur3Hash(id) % indexMetadata.NumberOfShards
 	return clusterState.RoutingTable.IndicesRouting[index].Shards[shardId]
 }
 
