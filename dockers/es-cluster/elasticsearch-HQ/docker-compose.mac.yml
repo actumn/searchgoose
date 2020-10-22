@@ -1,0 +1,8 @@
+version: '2'
+services:
+  elasticsearch-hq:
+    image: elastichq/elasticsearch-hq
+    ports:
+      - 5000:5000
+    environment:
+      - HQ_DEFAULT_URL=http://172.30.1.9:8082

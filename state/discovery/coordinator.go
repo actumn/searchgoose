@@ -85,6 +85,10 @@ func (c *Coordinator) Start() {
 			},
 			MasterNodeId: c.TransportService.LocalNode.Id,
 		},
+		Metadata: state.Metadata{
+			Indices:       map[string]state.IndexMetadata{},
+			IndicesLookup: map[string]state.IndexAbstractionAlias{},
+		},
 	}
 	c.PeerFinder = NewCoordinatorPeerFinder(c)
 	c.PeerFinder.currentTerm = c.getCurrentTerm()
@@ -127,6 +131,10 @@ func (c *Coordinator) becomeLeader(method string) {
 			MasterNodes: map[string]state.Node{
 				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
 			},
+		},
+		Metadata: state.Metadata{
+			Indices:       map[string]state.IndexMetadata{},
+			IndicesLookup: map[string]state.IndexAbstractionAlias{},
 		},
 	}
 
@@ -273,7 +281,7 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 	logrus.Infof("262, %v", nodes)
 	for _, node := range nodes {
 		logrus.Infof("Publish: leader=%v publish to DestNode=%v", c.TransportService.LocalNode, node)
-		go c.TransportService.SendRequest(node, transport.PUBLISH_REQ, newState.ToBytes(), func(response []byte) {
+		c.TransportService.SendRequest(node, transport.PUBLISH_REQ, newState.ToBytes(), func(response []byte) {
 
 		})
 	}
