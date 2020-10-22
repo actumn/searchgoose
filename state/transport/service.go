@@ -45,6 +45,7 @@ type Transport interface {
 	Register(action string, handler RequestHandler)
 	GetLocalAddress() string
 	GetSeedHosts() []string
+	GetNodeId() string
 	GetHandler(action string) RequestHandler
 }
 
@@ -63,8 +64,9 @@ type Service struct {
 	ConnectionLock    sync.RWMutex
 }
 
-func NewService(id string, transport Transport) *Service {
+func NewService(transport Transport) *Service {
 	address := transport.GetLocalAddress()
+	id := transport.GetNodeId()
 	service := &Service{
 		LocalNode:         state.CreateLocalNode(id, address),
 		Transport:         transport,

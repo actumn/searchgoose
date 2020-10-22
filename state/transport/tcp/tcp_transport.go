@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"io"
 	"net"
 	"strings"
@@ -48,7 +49,7 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 		response := DataFormatFromBytes(recvBuf[:n])
 		logrus.Infof("Receive %s from %s\n", response.Action, response.Source)
 		if strings.Contains(response.Action, "_FAIL") {
-			logrus.Infof("Error: %s", string(response.Content))
+			logrus.Warnf("%s", string(response.Content))
 		} else {
 			callback(response.Content)
 		}
@@ -90,9 +91,16 @@ func (c *ReplyChannel) GetDestAddress() string {
 	return c.destAddress
 }
 
-func NewTransport(address string, nodeId string, seedHosts []string) *Transport {
+func NewTransport() *Transport {
+
+	host := viper.GetString("network.host")
+	port := viper.GetString("transport.port")
+	seedHost := viper.GetString("discovery.seed_hosts")
+	seedHosts := strings.Split(seedHost, ",")
+	nodeId := viper.GetString("node.id")
+
 	return &Transport{
-		LocalAddress:    address,
+		LocalAddress:    host + ":" + port,
 		LocalNodeId:     nodeId,
 		SeedHosts:       seedHosts,
 		RequestHandlers: make(map[string]transport.RequestHandler),
@@ -106,7 +114,6 @@ func (t *Transport) Register(action string, handler transport.RequestHandler) {
 func (t *Transport) Start(address string) {
 	go func() {
 		l, err := net.Listen("tcp", address)
-		// l, err := net.Listen("tcp", ":8180")
 		if err != nil {
 			logrus.Fatalf("Fail to bind address to %s; err: %v", address, err)
 		}
@@ -174,6 +181,10 @@ func (t *Transport) GetLocalAddress() string {
 
 func (t *Transport) GetSeedHosts() []string {
 	return t.SeedHosts
+}
+
+func (t *Transport) GetNodeId() string {
+	return t.LocalNodeId
 }
 
 func (t *Transport) GetHandler(action string) transport.RequestHandler {
