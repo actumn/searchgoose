@@ -1,25 +1,30 @@
 package actions
 
 import (
+	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 )
 
 type RestIndicesStatsAction struct {
+	clusterService *cluster.Service
 	indicesService *indices.Service
 }
 
-func NewRestIndicesStatsAction(indicesService *indices.Service) *RestIndicesStatsAction {
+func NewRestIndicesStatsAction(clusterService *cluster.Service, indicesService *indices.Service) *RestIndicesStatsAction {
 	return &RestIndicesStatsAction{
+		clusterService: clusterService,
 		indicesService: indicesService,
 	}
 }
 
 func (h *RestIndicesStatsAction) Handle(r *RestRequest, reply ResponseListener) {
 	// TODO:: reply based on indices service and all cluster shards information
-	indicesMap := map[string]interface{}{
-		".kibana_task_manager_2": map[string]interface{}{
-			"uuid": "3qXOKMs-QYS0RL2ErQFubQ",
-		},
+	clusterState := h.clusterService.State()
+	indicesMap := map[string]interface{}{}
+	for _, index := range clusterState.Metadata.Indices {
+		indicesMap[index.Index.Name] = map[string]interface{}{
+			"uuid": index.Index.Uuid,
+		}
 	}
 	reply(RestResponse{
 		StatusCode: 200,

@@ -76,11 +76,7 @@ func (h *RestClusterState) Handle(r *RestRequest, reply ResponseListener) {
 	clusterState := h.clusterService.State()
 	metadata := clusterState.Metadata
 
-	indicesInfo := map[string]interface{}{
-		".kibana_task_manager_2": map[string]interface{}{ // TODO :: remove it
-			"state": "open",
-		},
-	}
+	indicesInfo := map[string]interface{}{}
 	for _, index := range metadata.Indices {
 		var mappings map[string]interface{}
 		if err := json.Unmarshal(index.Mapping["_doc"].Source, &mappings); err != nil {
@@ -157,6 +153,11 @@ type RestClusterStats struct {
 func NewRestClusterStats(clusterService *cluster.Service, transportService *transport.Service, indicesService *indices.Service) *RestClusterStats {
 	transportService.RegisterRequestHandler(ClusterStatsAction, func(channel transport.ReplyChannel, req []byte) {
 
+		for _, indexService := range indicesService.Indices {
+			for _, shard := range indexService.Shards {
+				shard.Stats()
+			}
+		}
 	})
 
 	return &RestClusterStats{

@@ -117,7 +117,7 @@ func New(
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/_stats", actions.MethodHandlers{
-		actions.GET: actions.NewRestIndicesStatsAction(indicesService),
+		actions.GET: actions.NewRestIndicesStatsAction(clusterService, indicesService),
 	})
 
 	///////////////////////////// cat /////////////////////////////////////
@@ -128,10 +128,10 @@ func New(
 		actions.GET: &actions.RestCatTemplates{},
 	})
 	c.pathTrie.insert("/_cat/nodes", actions.MethodHandlers{
-		actions.GET: actions.NewRestCatNodes(),
+		actions.GET: actions.NewRestCatNodes(clusterService, transportService),
 	})
 	c.pathTrie.insert("/_cat/indices", actions.MethodHandlers{
-		actions.GET: actions.NewRestCatIndices(indexNameExpressionResolver),
+		actions.GET: actions.NewRestCatIndices(clusterService, indexNameExpressionResolver, transportService),
 	})
 
 	//////////////////////////// cluster //////////////////////////////////
