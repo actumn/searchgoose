@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"runtime"
 	"strings"
-	"time"
 )
 
 func main() {
@@ -44,7 +43,7 @@ func start() {
 	//address := "localhost:8179"
 	//seedHosts := []string{"localhost:8180"} //8179
 	address := "localhost:8181"
-	seedHosts := []string{"localhost:8180"} //8181
+	seedHosts := []string{} //8181
 
 	var tcpTransport transport.Transport
 
@@ -74,10 +73,10 @@ func start() {
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator.Start()
-	time.Sleep(time.Duration(15) * time.Second)
+	//time.Sleep(time.Duration(15) * time.Second)
 
 	coordinator.StartInitialJoin()
-	time.Sleep(time.Duration(1000) * time.Second)
+	//time.Sleep(time.Duration(1000) * time.Second)
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, clusterMetadataIndexAliasService, indicesService, transportService, indexNameExpressionResolver)

@@ -77,6 +77,13 @@ func (c *Coordinator) Start() {
 				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
 			},
 			LocalNodeId: c.TransportService.LocalNode.Id,
+			DataNodes: map[string]state.Node{
+				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
+			},
+			MasterNodes: map[string]state.Node{
+				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
+			},
+			MasterNodeId: c.TransportService.LocalNode.Id,
 		},
 	}
 	c.PeerFinder = NewCoordinatorPeerFinder(c)
@@ -257,9 +264,9 @@ func (c *Coordinator) ensureTermAtLeast(sourceNode state.Node, targetTerm int64)
 }
 
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
-	if c.mode != LEADER {
-		return
-	}
+	//if c.mode != LEADER {
+	//	return
+	//}
 
 	newState := event.State
 	nodes := newState.Nodes.Nodes
