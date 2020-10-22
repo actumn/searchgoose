@@ -59,6 +59,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		h, params, err := allHandlers()
 		request.PathParams = params
 		if err != nil {
+			logrus.Warn(string(ctx.Method()), " ", request.Path, " ", err)
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			ctx.Response.SetStatusCode(400)
 			if err := json.NewEncoder(ctx).Encode(map[string]string{
@@ -79,10 +80,11 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 		}
 
 		handler.Handle(&request, func(response actions.RestResponse) {
+			logrus.Debug("reply on ", string(ctx.Method()), " ", request.Path)
 			ctx.Response.SetStatusCode(response.StatusCode)
 			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
 			if err := json.NewEncoder(ctx).Encode(response.Body); err != nil {
-				logrus.Info(err)
+				logrus.Error(err)
 			}
 		})
 		return
@@ -97,6 +99,7 @@ func New(
 	clusterService *cluster.Service,
 	clusterMetadataCreateIndexService *cluster.MetadataCreateIndexService,
 	clusterMetadataDeleteIndexService *cluster.MetadataDeleteIndexService,
+	clusterMetadataIndexAliasService *cluster.MetadataIndexAliasService,
 	indicesService *indices.Service,
 	transportService *transport.Service,
 	indexNameExpressionResolver *indices.NameExpressionResolver,
@@ -112,9 +115,11 @@ func New(
 	c.pathTrie.insert("/_cat/templates/{name}", actions.MethodHandlers{
 		actions.GET: &actions.RestTemplates{},
 	})
+	c.pathTrie.insert("/_aliases", actions.MethodHandlers{
+		actions.POST: actions.NewRestPostIndexAlias(clusterMetadataIndexAliasService),
+	})
 	c.pathTrie.insert("/_alias/{name}", actions.MethodHandlers{
-		actions.GET:  actions.NewRestGetIndexAlias(),
-		actions.POST: actions.NewRestPostIndexAlias(),
+		actions.GET: actions.NewRestGetIndexAlias(clusterService, indexNameExpressionResolver),
 	})
 	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
 		actions.GET: &actions.RestNodes{
@@ -128,19 +133,24 @@ func New(
 		actions.GET:    actions.NewRestGetIndex(clusterService, indexNameExpressionResolver),
 		actions.PUT:    actions.NewRestPutIndex(clusterMetadataCreateIndexService),
 		actions.DELETE: actions.NewRestDeleteIndex(clusterService, indexNameExpressionResolver, clusterMetadataDeleteIndexService),
-		actions.HEAD:   &actions.RestHeadIndex{},
+		actions.HEAD:   actions.NewRestHeadIndex(clusterService, indexNameExpressionResolver),
 	})
 	c.pathTrie.insert("/{index}/_doc", actions.MethodHandlers{
-		actions.POST: actions.NewRestIndexDoc(clusterService, indicesService, transportService),
+		actions.POST: actions.NewRestIndexDoc(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
-		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, transportService),
-		actions.PUT:    actions.NewRestIndexDocId(clusterService, indicesService, transportService),
-		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, transportService),
+		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.PUT:    actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
+		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 		actions.HEAD:   &actions.RestHeadDoc{},
 	})
 	c.pathTrie.insert("/{index}/_search", actions.MethodHandlers{
-		actions.GET: actions.NewRestSearch(clusterService, indicesService, transportService),
+		actions.GET:  actions.NewRestSearch(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.POST: actions.NewRestSearch(clusterService, indicesService, indexNameExpressionResolver, transportService),
+	})
+	c.pathTrie.insert("/{index}/_refresh", actions.MethodHandlers{
+		actions.GET:  actions.NewRestRefresh(clusterService),
+		actions.POST: actions.NewRestRefresh(clusterService),
 	})
 	//c.pathTrie.insert("/{index}/_bulk", actions.MethodHandlers{
 	//	actions.POST: ,

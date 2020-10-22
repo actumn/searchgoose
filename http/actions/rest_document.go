@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"github.com/actumn/searchgoose/common"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
@@ -45,16 +46,18 @@ func indexRequestFromBytes(b []byte) *indexRequest {
 }
 
 type indexResponse struct {
-	Err error
+	Err string
 }
 
 type RestIndexDoc struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	createIndexService          *cluster.MetadataCreateIndexService
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDoc {
+func NewRestIndexDoc(clusterService *cluster.Service, createIndexService *cluster.MetadataCreateIndexService, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDoc {
 	// Handle primary shard request
 	transportService.RegisterRequestHandler(IndexAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("indexAction on primary shard")
@@ -76,14 +79,16 @@ func NewRestIndexDoc(clusterService *cluster.Service, indicesService *indices.Se
 	})
 
 	return &RestIndexDoc{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		createIndexService:          createIndexService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
 func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := common.RandomBase64()
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
@@ -97,8 +102,23 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 
-	// TODO :: auto create index if absent.
 	clusterState := h.clusterService.State()
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
+	if indexName == "" {
+		req := cluster.CreateIndexClusterStateUpdateRequest{
+			Index:    indexExpression,
+			Mappings: []byte(`{ "properties": {} }`),
+			Settings: map[string]interface{}{
+				"number_of_shards": 1.0,
+			},
+		}
+		// TODO :: refactor to callback function to execute after create
+		// TODO :: index dynamic mapping
+		h.createIndexService.CreateIndex(req)
+		indexName = indexExpression
+		clusterState = h.clusterService.State()
+
+	}
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
@@ -129,22 +149,26 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type RestIndexDocId struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	createIndexService          *cluster.MetadataCreateIndexService
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestIndexDocId(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestIndexDocId {
+func NewRestIndexDocId(clusterService *cluster.Service, createIndexService *cluster.MetadataCreateIndexService, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDocId {
 	// Handle primary shard request
 	return &RestIndexDocId{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		createIndexService:          createIndexService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
 func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 	var body map[string]interface{}
 	if err := json.Unmarshal(r.Body, &body); err != nil {
@@ -158,9 +182,23 @@ func (h *RestIndexDocId) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 
-	// TODO :: auto create index if absent.
 	clusterState := h.clusterService.State()
-	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
+	if indexName == "" {
+		req := cluster.CreateIndexClusterStateUpdateRequest{
+			Index:    indexExpression,
+			Mappings: []byte(`{ "properties": {} }`),
+			Settings: map[string]interface{}{
+				"number_of_shards": 1.0,
+			},
+		}
+		// TODO :: refactor to callback function to execute after create
+		// TODO :: index dynamic mapping
+		h.createIndexService.CreateIndex(req)
+		indexName = indexExpression
+		clusterState = h.clusterService.State()
+	}
+	shardRouting := cluster.IndexShard(*clusterState, indexExpression, documentId).Primary
 	indexRequest := indexRequest{
 		Index:   indexName,
 		Id:      documentId,
@@ -218,7 +256,7 @@ type getResponse struct {
 	Id      string
 	ShardId state.ShardId
 	Fields  map[string]interface{}
-	Err     error
+	Err     string
 }
 
 func (r *getResponse) toBytes() []byte {
@@ -241,12 +279,13 @@ func getResponseFromBytes(b []byte) *getResponse {
 }
 
 type RestGetDoc struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestGetDoc {
+func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestGetDoc {
 	transportService.RegisterRequestHandler(GetAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("getAction on shard")
 		request := getRequestFromBytes(req)
@@ -257,7 +296,7 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 		if doc, err := indexShard.Get(request.Id); err != nil {
 			logrus.Warn(err)
 			res := getResponse{
-				Err: err,
+				Err: err.Error(),
 			}
 			channel.SendMessage("", res.toBytes())
 		} else {
@@ -272,17 +311,19 @@ func NewRestGetDoc(clusterService *cluster.Service, indicesService *indices.Serv
 	})
 
 	return &RestGetDoc{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
 func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 
 	clusterState := h.clusterService.State()
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
 	shardRouting := cluster.GetShards(*clusterState, indexName, documentId).Primary
 	getRequest := getRequest{
 		Index:   indexName,
@@ -291,11 +332,15 @@ func (h *RestGetDoc) Handle(r *RestRequest, reply ResponseListener) {
 	}
 	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
 		res := getResponseFromBytes(response)
-		if res.Err != nil {
+		if res.Err != "" {
+			logrus.Warn(errors.New(res.Err))
 			reply(RestResponse{
 				StatusCode: 400,
 				Body: map[string]interface{}{
-					"err": res.Err,
+					"_index": indexName,
+					"_type":  "_doc",
+					"_id":    documentId,
+					"found":  res.Err,
 				},
 			})
 		} else {
@@ -343,16 +388,17 @@ func deleteRequestFromBytes(b []byte) *deleteRequest {
 }
 
 type deleteResponse struct {
-	Err error
+	Err string
 }
 
 type RestDeleteDoc struct {
-	clusterService   *cluster.Service
-	indicesService   *indices.Service
-	transportService *transport.Service
+	clusterService              *cluster.Service
+	indicesService              *indices.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestDeleteDoc {
+func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestDeleteDoc {
 	transportService.RegisterRequestHandler(DeleteAction, func(channel transport.ReplyChannel, req []byte) {
 		logrus.Info("deleteAction on primary shard")
 		request := deleteRequestFromBytes(req)
@@ -369,17 +415,19 @@ func NewRestDeleteDoc(clusterService *cluster.Service, indicesService *indices.S
 	})
 
 	return &RestDeleteDoc{
-		clusterService:   clusterService,
-		indicesService:   indicesService,
-		transportService: transportService,
+		clusterService:              clusterService,
+		indicesService:              indicesService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
 func (h *RestDeleteDoc) Handle(r *RestRequest, reply ResponseListener) {
-	indexName := r.PathParams["index"]
+	indexExpression := r.PathParams["index"]
 	documentId := r.PathParams["id"]
 
 	clusterState := h.clusterService.State()
+	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
 	shardRouting := cluster.IndexShard(*clusterState, indexName, documentId).Primary
 	deleteRequest := deleteRequest{
 		Index:   indexName,

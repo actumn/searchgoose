@@ -48,6 +48,14 @@ func (s *Service) UpdateMapping(metadata state.IndexMetadata) {
 			docMapping.AddFieldMappingsAt(field, mapping.NewBooleanFieldMapping())
 		case "geo_point":
 			docMapping.AddFieldMappingsAt(field, mapping.NewGeoPointFieldMapping())
+		//case "binary":
+		//	docMapping.AddFieldMappingsAt(field, NewBinaryFieldMapping())
+		//case "range":
+		//	docMapping.AddFieldMappingsAt(field, NewRangeFieldMapping())
+		case "object":
+			docMapping.AddFieldMappingsAt(field, NewObjectFieldMapping())
+		case "nested":
+			docMapping.AddFieldMappingsAt(field, NewNestedFieldMapping())
 		}
 	}
 }

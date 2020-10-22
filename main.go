@@ -68,6 +68,7 @@ func start() {
 	allocationService := cluster.NewAllocationService()
 	clusterMetadataCreateIndexService := cluster.NewMetadataCreateIndexService(clusterService, allocationService)
 	clusterMetadataDeleteIndexService := cluster.NewMetadataDeleteIndexService(clusterService, allocationService)
+	clusterMetadataIndexAliasService := cluster.NewMetadataIndexAliasService(clusterService)
 
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
@@ -78,7 +79,7 @@ func start() {
 	//time.Sleep(time.Duration(1000) * time.Second)
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
-	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, indicesService, transportService, indexNameExpressionResolver)
+	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, clusterMetadataIndexAliasService, indicesService, transportService, indexNameExpressionResolver)
 	logrus.Info("start server...")
 	if err := b.Start(":8080"); err != nil {
 		panic(err)

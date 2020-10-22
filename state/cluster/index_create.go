@@ -35,7 +35,12 @@ func (s *MetadataCreateIndexService) CreateIndex(req CreateIndexClusterStateUpda
 func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState, req CreateIndexClusterStateUpdateRequest) state.ClusterState {
 	// prepare Settings
 	settings := req.Settings
-	routingNumShards := int(settings["number_of_shards"].(float64))
+	var routingNumShards int
+	if num, ok := settings["number_of_shards"]; ok {
+		routingNumShards = int(num.(float64))
+	} else {
+		routingNumShards = 3
+	}
 
 	// prepare indexMetadata
 	indexMetadata := state.IndexMetadata{
@@ -44,6 +49,7 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 			Uuid: common.RandomBase64(),
 		},
 		RoutingNumShards: routingNumShards,
+		Aliases:          map[string]state.AliasMetadata{},
 		Mapping: map[string]state.MappingMetadata{
 			"_doc": {
 				Type:   "_doc",
@@ -56,6 +62,7 @@ func (s *MetadataCreateIndexService) applyCreateIndex(current state.ClusterState
 		Indices: map[string]state.IndexMetadata{
 			indexMetadata.Index.Name: indexMetadata,
 		},
+		IndicesLookup: map[string]state.IndexAbstractionAlias{},
 	}
 	for k, v := range current.Metadata.Indices {
 		metadata.Indices[k] = v
