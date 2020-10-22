@@ -198,7 +198,8 @@ func (c *Coordinator) joinLeaderInTerm(request *StartJoinRequest) *state.Join {
 		c.becomeCandidate("joinLeaderInTerm")
 	} else {
 		// followersChecker.updateFastResponseState(getCurrentTerm(), mode);
-		c.PreVoteCollector.update(NewPreVoteResponse(c.getCurrentTerm()), state.Node{})
+		c.PreVoteCollector.update(NewPreVoteResponse(c.getCurrentTerm()), c.ApplierState.Nodes.MasterNode())
+		//c.PreVoteCollector.update(NewPreVoteResponse(c.getCurrentTerm()), state.Node{})
 	}
 
 	return join

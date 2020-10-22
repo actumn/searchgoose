@@ -3,7 +3,6 @@ package discovery
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
@@ -98,12 +97,17 @@ func (p *PreVoteCollector) handlePreVoteResponse(response *PreVoteResponse, send
 	nodeIds = append(nodeIds, localNode.Id)
 
 	if voteCollection.IsQuorum(nodeIds) == false {
-		fmt.Println("No quorum yet")
+		logrus.Infof("No quorum yet")
 		return
 	}
 
 	if p.electionStarted == true {
-		fmt.Println("Election already started")
+		logrus.Infof("Election already started")
+		return
+	}
+
+	if p.getLeader() != (state.Node{}) {
+		logrus.Infof("Already elected leader=%v", p.getLeader())
 		return
 	}
 

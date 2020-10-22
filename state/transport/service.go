@@ -154,18 +154,10 @@ func (s *Service) ConnectToRemoteNode(address string, callback func(node *state.
 
 			connectedNode := data.Node
 
-			s.ConnectionManager[connectedNode.Id] = ConnectionEntry{
+			s.SetConnection(connectedNode.Id, ConnectionEntry{
 				conn: conn,
 				node: connectedNode,
-			}
-
-			/*
-				s.SetConnection(connectedNode.Id, ConnectionEntry{
-					conn: conn,
-					node: connectedNode,
-				})
-
-			*/
+			})
 
 			callback(&connectedNode)
 		})
