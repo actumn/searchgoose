@@ -1,0 +1,15 @@
+################## Serchgoose Configuration Example ##################
+
+cluster.name: searchgoose-testClusters
+
+node.name: "sg-node-1"
+node.master: true
+node.data: true
+node.id:
+
+discovery.seed_hosts: "127.0.0.1:8179,127.0.0.1:8181"
+
+network.host: "127.0.0.1"
+transport.port: 8180
+http.port: 8080
+

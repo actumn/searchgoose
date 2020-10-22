@@ -45,7 +45,7 @@ func (h *JoinHelper) handleStartJoinRequest(channel transport.ReplyChannel, req 
 
 	h.SendJoinRequest(destination, h.currentTermSupplier(), join)
 
-	channel.SendMessage(transport.START_JOIN_ACK, []byte{})
+	channel.SendMessage(transport.START_JOIN_ACK, []byte("Send START_JOIN_ACK"))
 }
 
 func (h *JoinHelper) SendJoinRequest(destination state.Node, term int64, join *state.Join) {
