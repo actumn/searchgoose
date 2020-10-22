@@ -77,6 +77,17 @@ func (c *Coordinator) Start() {
 				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
 			},
 			LocalNodeId: c.TransportService.LocalNode.Id,
+			DataNodes: map[string]state.Node{
+				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
+			},
+			MasterNodes: map[string]state.Node{
+				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
+			},
+			MasterNodeId: c.TransportService.LocalNode.Id,
+		},
+		Metadata: state.Metadata{
+			Indices:       map[string]state.IndexMetadata{},
+			IndicesLookup: map[string]state.IndexAbstractionAlias{},
 		},
 	}
 	c.PeerFinder = NewCoordinatorPeerFinder(c)
@@ -120,6 +131,10 @@ func (c *Coordinator) becomeLeader(method string) {
 			MasterNodes: map[string]state.Node{
 				c.TransportService.LocalNode.Id: c.TransportService.GetLocalNode(),
 			},
+		},
+		Metadata: state.Metadata{
+			Indices:       map[string]state.IndexMetadata{},
+			IndicesLookup: map[string]state.IndexAbstractionAlias{},
 		},
 	}
 
@@ -257,16 +272,16 @@ func (c *Coordinator) ensureTermAtLeast(sourceNode state.Node, targetTerm int64)
 }
 
 func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
-	if c.mode != LEADER {
-		return
-	}
+	//if c.mode != LEADER {
+	//	return
+	//}
 
 	newState := event.State
 	nodes := newState.Nodes.Nodes
 	logrus.Infof("262, %v", nodes)
 	for _, node := range nodes {
 		logrus.Infof("Publish: leader=%v publish to DestNode=%v", c.TransportService.LocalNode, node)
-		go c.TransportService.SendRequest(node, transport.PUBLISH_REQ, newState.ToBytes(), func(response []byte) {
+		c.TransportService.SendRequest(node, transport.PUBLISH_REQ, newState.ToBytes(), func(response []byte) {
 
 		})
 	}
