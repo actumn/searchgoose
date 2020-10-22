@@ -26,7 +26,7 @@ func (c *ClusterState) ToBytes() []byte {
 	}
 	return buffer.Bytes()
 }
-func ClusterStateFromBytes(b []byte, localNode *Node) *ClusterState {
+func ClusterStateFromBytes(b []byte, localNode Node) *ClusterState {
 	buffer := bytes.NewBuffer(b)
 	decoder := gob.NewDecoder(buffer)
 	var state ClusterState
@@ -82,7 +82,7 @@ func (v *VoteCollection) IsQuorum(nodes []string) bool {
 	}
 
 	intersection := common.GetIntersection(nodes, votes)
-	logrus.Info(77, "configured", len(nodes), "votes", len(votes), "intersection", len(intersection))
+	logrus.Infof("Voting Result : configured={%d} votes={%d} intersection={%d}\n", len(nodes), len(votes), len(intersection))
 
 	return len(intersection)*2 > len(nodes)
 }

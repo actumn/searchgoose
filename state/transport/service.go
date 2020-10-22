@@ -9,17 +9,21 @@ import (
 )
 
 const (
-	HANDSHAKE_REQ  = "HANDSHAKE_REQ"
-	HANDSHAKE_ACK  = "HANDSHAKE_ACK"
-	HANDSHAKE_FAIL = "HANDSHAKE_FAIL"
-	PEERFIND_REQ   = "PEERFIND_REQ"
-	PEERFIND_ACK   = "PEERFIND_ACK"
-	PEERFIND_FAIL  = "PEERFIND_FAIL"
-	PREVOTE_REQ    = "PREVOTE_REQ"
-	PREVOTE_RES    = "PREVOTE_RES"
-	START_JOIN     = "START_JOIN"
-	START_JOIN_ACK = "START_JOIN_ACK"
-	JOIN_REQ       = "JOIN_REQ"
+	HANDSHAKE_REQ   = "HANDSHAKE_REQ"
+	HANDSHAKE_ACK   = "HANDSHAKE_ACK"
+	HANDSHAKE_FAIL  = "HANDSHAKE_FAIL"
+	PEERFIND_REQ    = "PEERFIND_REQ"
+	PEERFIND_ACK    = "PEERFIND_ACK"
+	PEERFIND_FAIL   = "PEERFIND_FAIL"
+	PREVOTE_REQ     = "PREVOTE_REQ"
+	PREVOTE_RES     = "PREVOTE_RES"
+	PREVOTE_FAIL    = "PREVOTE_FAIL"
+	START_JOIN_REQ  = "START_JOIN"
+	START_JOIN_ACK  = "START_JOIN_ACK"
+	START_JOIN_FAIL = "START_JOIN_FAIL"
+	JOIN_REQ        = "JOIN_REQ"
+	PUBLISH_REQ     = "PUBLISH_REQ"
+	PUBLISH_ACK     = "PUBLISH_ACK"
 )
 
 // Interfaces
@@ -126,19 +130,18 @@ func (s *Service) ConnectToRemoteNode(address string, callback func(node *state.
 	curNode := s.LocalNode
 
 	if curNode.HostAddress == address {
-		logrus.Printf("ConnectToRemoteNode(%s) not connecting local node ", address)
+		logrus.Infof("ConnectToRemoteNode(%s) not connecting local node ", address)
 		return
 	}
 
 	for _, value := range s.ConnectionManager {
 		if value.node.HostAddress == address {
-			logrus.Printf("Connection is already established; %s", address)
+			logrus.Infof("Connection is already established; %s", address)
 			return
 		}
 	}
 
 	// TODO :: goroutine 으로 빼면 좋을 것 같다
-	//var mutex = &sync.Mutex{}
 	s.Transport.OpenConnection(address, func(conn Connection) {
 		handshakeData := HandshakeRequest{
 			RemoteAddress: address,
@@ -147,22 +150,14 @@ func (s *Service) ConnectToRemoteNode(address string, callback func(node *state.
 
 		s.SendRequestConn(conn, HANDSHAKE_REQ, content, func(res []byte) {
 			data := HandshakeResponseFromBytes(res)
-			logrus.Info("Success on handshaking with %v\n", data.Node)
+			logrus.Infof("Success on handshaking with %v\n", data.Node)
 
 			connectedNode := data.Node
 
-			s.ConnectionManager[connectedNode.Id] = ConnectionEntry{
+			s.SetConnection(connectedNode.Id, ConnectionEntry{
 				conn: conn,
 				node: connectedNode,
-			}
-
-			/*
-				s.SetConnection(connectedNode.Id, ConnectionEntry{
-					conn: conn,
-					node: connectedNode,
-				})
-
-			*/
+			})
 
 			callback(&connectedNode)
 		})
@@ -176,7 +171,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node, callbac
 		KnownPeers: knownPeers,
 	}
 
-	logrus.Printf("Peer=%v requesting peers %s\n", nowNode, knownPeers)
+	logrus.Infof("Peer=%v requesting peers %s\n", nowNode, knownPeers)
 
 	// TODO :: 나중에 request handler interface로 뽑아내기
 	request := peerFindData.ToBytes()
@@ -185,7 +180,7 @@ func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node, callbac
 		data := PeersResponseFromBytes(res)
 		peers := data.KnownPeers
 
-		logrus.Printf("Peer=%v received PeersResponse=%v\n", nowNode, data)
+		logrus.Infof("Peer=%v received PeersResponse=%v\n", nowNode, data)
 
 		for _, peer := range peers {
 			go s.ConnectToRemoteNode(peer.HostAddress, func(remoteNode *state.Node) {
@@ -223,7 +218,7 @@ func (s *Service) handleHandshake(channel ReplyChannel, req []byte) {
 func (s *Service) handlePeersRequest(channel ReplyChannel, req []byte) {
 
 	peerReqData := PeersRequestFromBytes(req)
-	logrus.Printf("Receive Peer Finding REQ from %s; %s\n", channel.GetDestAddress(), peerReqData.KnownPeers)
+	logrus.Infof("Receive Peer Finding REQ from %s; %s\n", channel.GetDestAddress(), peerReqData.KnownPeers)
 
 	peers := peerReqData.KnownPeers
 	for _, peer := range peers {
@@ -238,7 +233,7 @@ func (s *Service) handlePeersRequest(channel ReplyChannel, req []byte) {
 		knownPeers = append(knownPeers, peer.node)
 	}
 
-	logrus.Info("Send Peer Finding RES to %s; %s\n", channel.GetDestAddress(), knownPeers)
+	logrus.Infof("Send Peer Finding RES to %s; %s\n", channel.GetDestAddress(), knownPeers)
 
 	peerResData := PeersResponse{
 		KnownPeers: knownPeers,
@@ -351,10 +346,11 @@ type LocalConnection struct {
 	service *Service
 }
 
-func (c *LocalConnection) SendRequest(action string, req []byte, callback func(byte []byte)) {
+func (c *LocalConnection) SendRequest(action string, req []byte, callback func(response []byte)) {
 	handler := c.service.Transport.GetHandler(action)
 	replyChannel := &DirectReplyChannel{
 		callback: callback,
+		address:  c.service.LocalNode.HostAddress,
 	}
 
 	handler(replyChannel, req)
@@ -369,7 +365,7 @@ func (c *LocalConnection) GetSourceAddress() string {
 }
 
 type DirectReplyChannel struct {
-	// address string
+	address  string
 	callback func(byte []byte)
 }
 
@@ -379,9 +375,9 @@ func (c *DirectReplyChannel) SendMessage(action string, b []byte) (int, error) {
 }
 
 func (c *DirectReplyChannel) GetDestAddress() string {
-	return c.GetDestAddress()
+	return c.address
 }
 
 func (c *DirectReplyChannel) GetSourceAddress() string {
-	return c.GetSourceAddress()
+	return c.address
 }

@@ -19,6 +19,7 @@ type Node struct {
 }
 
 func CreateLocalNode(id string, address string) *Node {
+	//nodeName := fmt.Sprintf("sg-node-%d", rand.Intn(10))
 	return &Node{
 		// Name:        nodeName,
 		Id:          id,
@@ -54,13 +55,13 @@ func isDataNode() bool {
 }
 
 type Nodes struct {
-	Nodes        map[string]*Node
-	DataNodes    map[string]*Node
-	MasterNodes  map[string]*Node
+	Nodes        map[string]Node
+	DataNodes    map[string]Node
+	MasterNodes  map[string]Node
 	MasterNodeId string
 	LocalNodeId  string
 }
 
-func (n *Nodes) MasterNode() *Node {
+func (n *Nodes) MasterNode() Node {
 	return n.Nodes[n.MasterNodeId]
 }

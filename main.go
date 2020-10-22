@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"runtime"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 
 func init() {
 	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetReportCaller(true)
+	//logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
 		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
@@ -37,13 +38,13 @@ func start() {
 	logrus.Info("[Node Id]: ", nodeId)
 
 	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
-	address := "localhost:8180"
-	//address := "localhost:8179"
-	//address := "localhost:8181"
 
-	seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
+	//address := "localhost:8180"
+	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
+	//address := "localhost:8179"
 	//seedHosts := []string{"localhost:8180"} //8179
-	//seedHosts := []string{"localhost:8180"} //8181
+	address := "localhost:8181"
+	seedHosts := []string{"localhost:8180"} //8181
 
 	var tcpTransport transport.Transport
 
@@ -73,17 +74,17 @@ func start() {
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator.Start()
-	//time.Sleep(time.Duration(15) * time.Second)
-	//
-	//coordinator.StartInitialJoin()
-	//time.Sleep(time.Duration(1000) * time.Second)
+	time.Sleep(time.Duration(15) * time.Second)
+
+	coordinator.StartInitialJoin()
+	time.Sleep(time.Duration(1000) * time.Second)
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, clusterMetadataIndexAliasService, indicesService, transportService, indexNameExpressionResolver)
 	logrus.Info("start server...")
-	if err := b.Start(":8080"); err != nil {
+	//if err := b.Start(":8080"); err != nil { panic(err) }
+	//if err := b.Start(":8081"); err != nil { panic(err) }
+	if err := b.Start(":8082"); err != nil {
 		panic(err)
 	}
-	//if err := b.Start(":8081"); err != nil { panic(err) }
-	//if err := b.Start(":8082"); err != nil { panic(err) }
 }

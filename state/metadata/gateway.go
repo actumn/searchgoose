@@ -28,14 +28,14 @@ func (m *GatewayMetaState) Start(
 	clusterState := &state.ClusterState{
 		Name: "searchgoose-testCluster",
 		Nodes: &state.Nodes{
-			Nodes: map[string]*state.Node{
-				transportService.LocalNode.Id: transportService.LocalNode,
+			Nodes: map[string]state.Node{
+				transportService.LocalNode.Id: transportService.GetLocalNode(),
 			},
-			MasterNodes: map[string]*state.Node{
-				transportService.LocalNode.Id: transportService.LocalNode,
+			MasterNodes: map[string]state.Node{
+				transportService.LocalNode.Id: transportService.GetLocalNode(),
 			},
-			DataNodes: map[string]*state.Node{
-				transportService.LocalNode.Id: transportService.LocalNode,
+			DataNodes: map[string]state.Node{
+				transportService.LocalNode.Id: transportService.GetLocalNode(),
 			},
 			LocalNodeId: transportService.LocalNode.Id,
 		},
