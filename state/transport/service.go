@@ -31,6 +31,7 @@ type Connection interface {
 	SendRequest(action string, req []byte, callback func(byte []byte))
 	GetSourceAddress() string
 	GetDestAddress() string
+	GetMessage() string
 }
 
 type ReplyChannel interface {
@@ -74,7 +75,6 @@ func NewService(transport Transport) *Service {
 		ConnectionLock:    sync.RWMutex{},
 	}
 	service.RegisterRequestHandler(HANDSHAKE_REQ, service.handleHandshake)
-	service.RegisterRequestHandler(PEERFIND_REQ, service.handlePeersRequest)
 
 	return service
 }
@@ -136,15 +136,19 @@ func (s *Service) ConnectToRemoteNode(address string, callback func(node *state.
 		return
 	}
 
-	for _, value := range s.ConnectionManager {
-		if value.node.HostAddress == address {
-			logrus.Infof("Connection is already established; %s", address)
-			return
-		}
+	if node := s.GetNodeByAddress(address); node != nil {
+		logrus.Infof("Connection is already established; %s", address)
+		callback(node)
+		return
 	}
 
 	// TODO :: goroutine 으로 빼면 좋을 것 같다
 	s.Transport.OpenConnection(address, func(conn Connection) {
+		if len(conn.GetMessage()) > 0 {
+			callback(nil)
+			return
+		}
+
 		handshakeData := HandshakeRequest{
 			RemoteAddress: address,
 		}
@@ -166,43 +170,21 @@ func (s *Service) ConnectToRemoteNode(address string, callback func(node *state.
 	})
 }
 
-func (s *Service) RequestPeers(node state.Node, knownPeers []state.Node, callback func()) {
-	nowNode := *(s.LocalNode)
-	peerFindData := PeersRequest{
-		SourceNode: nowNode,
-		KnownPeers: knownPeers,
-	}
-
-	logrus.Infof("Peer=%v requesting peers %s\n", nowNode, knownPeers)
-
-	// TODO :: 나중에 request handler interface로 뽑아내기
-	request := peerFindData.ToBytes()
-
-	s.SendRequest(node, PEERFIND_REQ, request, func(res []byte) {
-		data := PeersResponseFromBytes(res)
-		peers := data.KnownPeers
-
-		logrus.Infof("Peer=%v received PeersResponse=%v\n", nowNode, data)
-
-		for _, peer := range peers {
-			go s.ConnectToRemoteNode(peer.HostAddress, func(remoteNode *state.Node) {
-				_, connectedNodes := s.GetConnectedPeers()
-				s.RequestPeers(*remoteNode, connectedNodes, func() {})
-			})
+func (s *Service) GetNodeByAddress(address string) *state.Node {
+	for _, value := range s.ConnectionManager {
+		if value.node.HostAddress == address {
+			return &value.node
 		}
-		callback()
-	})
-}
-
-func (s *Service) IsConnected(address string) bool {
-	if _, ok := s.ConnectionManager[address]; ok {
-		return true
 	}
-	return false
+	return nil
 }
 
 func (s *Service) GetLocalNode() state.Node {
 	return *(s.LocalNode)
+}
+
+func (s *Service) GetSeedHosts() []string {
+	return s.Transport.GetSeedHosts()
 }
 
 // handlers
@@ -215,34 +197,6 @@ func (s *Service) handleHandshake(channel ReplyChannel, req []byte) {
 
 	response := handShakeData.ToBytes()
 	channel.SendMessage(HANDSHAKE_ACK, response)
-}
-
-func (s *Service) handlePeersRequest(channel ReplyChannel, req []byte) {
-
-	peerReqData := PeersRequestFromBytes(req)
-	logrus.Infof("Receive Peer Finding REQ from %s; %s\n", channel.GetDestAddress(), peerReqData.KnownPeers)
-
-	peers := peerReqData.KnownPeers
-	for _, peer := range peers {
-		go s.ConnectToRemoteNode(peer.HostAddress, func(remoteNode *state.Node) {
-			_, connectedNodes := s.GetConnectedPeers()
-			s.RequestPeers(*remoteNode, connectedNodes, func() {})
-		})
-	}
-
-	knownPeers := make([]state.Node, 0, len(s.ConnectionManager))
-	for _, peer := range s.ConnectionManager {
-		knownPeers = append(knownPeers, peer.node)
-	}
-
-	logrus.Infof("Send Peer Finding RES to %s; %s\n", channel.GetDestAddress(), knownPeers)
-
-	peerResData := PeersResponse{
-		KnownPeers: knownPeers,
-	}
-
-	response := peerResData.ToBytes()
-	channel.SendMessage(PEERFIND_ACK, response)
 }
 
 // Templates
@@ -295,55 +249,6 @@ func HandshakeResponseFromBytes(b []byte) *HandshakeResponse {
 	return &data
 }
 
-// Peer-find
-type PeersRequest struct {
-	SourceNode state.Node
-	KnownPeers []state.Node
-}
-
-func (r *PeersRequest) ToBytes() []byte {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	if err := enc.Encode(r); err != nil {
-		logrus.Fatal(err)
-	}
-	return buffer.Bytes()
-}
-
-func PeersRequestFromBytes(b []byte) *PeersRequest {
-	buffer := bytes.NewBuffer(b)
-	decoder := gob.NewDecoder(buffer)
-	var data PeersRequest
-	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
-	}
-	return &data
-}
-
-type PeersResponse struct {
-	MasterNode state.Node
-	KnownPeers []state.Node
-}
-
-func (r *PeersResponse) ToBytes() []byte {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	if err := enc.Encode(r); err != nil {
-		logrus.Fatal(err)
-	}
-	return buffer.Bytes()
-}
-
-func PeersResponseFromBytes(b []byte) *PeersResponse {
-	buffer := bytes.NewBuffer(b)
-	decoder := gob.NewDecoder(buffer)
-	var data PeersResponse
-	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
-	}
-	return &data
-}
-
 type LocalConnection struct {
 	service *Service
 }
@@ -364,6 +269,10 @@ func (c *LocalConnection) GetDestAddress() string {
 
 func (c *LocalConnection) GetSourceAddress() string {
 	return c.service.LocalNode.HostAddress
+}
+
+func (c *LocalConnection) GetMessage() string {
+	return ""
 }
 
 type DirectReplyChannel struct {

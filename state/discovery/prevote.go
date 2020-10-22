@@ -71,9 +71,7 @@ func (p *PreVoteCollector) handlePreVoteRequest(channel transport.ReplyChannel, 
 	// if the current node has not received the information that a node has been elected as the leader
 	if leader != (state.Node{}) {
 		logrus.Infof("Election already finished, won leader=%v", leader)
-		errMsg := "Election already finished"
-		channel.SendMessage(transport.PREVOTE_FAIL, []byte(errMsg))
-		return
+		preVoteResData.Err = "Election already finished"
 	}
 
 	response := preVoteResData.ToBytes()
@@ -116,6 +114,7 @@ func (p *PreVoteCollector) handlePreVoteResponse(response *PreVoteResponse, send
 	p.electionStarted = true
 	logrus.Infof("%v add %v from PrevoteResponse=%v\n, starting election\n", p.transportService.LocalNode, response, sender)
 
+	//
 	p.startElection()
 }
 
@@ -186,6 +185,7 @@ type PreVoteResponse struct {
 	CurrentTerm      int64
 	lastAcceptedTerm int64
 	// lastAcceptedVersion
+	Err string
 }
 
 func NewPreVoteResponse(currentTerm int64) *PreVoteResponse {

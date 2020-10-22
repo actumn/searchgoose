@@ -3,6 +3,7 @@ package discovery
 import (
 	"bytes"
 	"encoding/gob"
+	"github.com/actumn/searchgoose/common"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
@@ -33,7 +34,7 @@ func NewJoinHelper(
 func (h *JoinHelper) SendStartJoinRequest(startJoinRequest StartJoinRequest, destination state.Node) {
 	request := startJoinRequest.ToBytes()
 	h.transportService.SendRequest(destination, transport.START_JOIN_REQ, request, func(res []byte) {
-		logrus.Infof("StartJoinRequest : successful response to %v from %v\n", startJoinRequest, destination)
+		logrus.Infof("StartJoinRequest : successful response=%v from %v\n", startJoinRequest, destination)
 	})
 }
 
@@ -43,36 +44,39 @@ func (h *JoinHelper) handleStartJoinRequest(channel transport.ReplyChannel, req 
 
 	join := h.joinLeaderInTerm(startJoinReqData)
 
-	h.SendJoinRequest(destination, h.currentTermSupplier(), join)
+	h.SendJoinRequest(destination, h.currentTermSupplier(), join, func() {})
 
 	channel.SendMessage(transport.START_JOIN_ACK, []byte("Send START_JOIN_ACK"))
 }
 
-func (h *JoinHelper) SendJoinRequest(destination state.Node, term int64, join *state.Join) {
+func (h *JoinHelper) SendJoinRequest(destination state.Node, term int64, join *state.Join, done func()) {
+
+	var newJoin state.Join
+	if join == nil {
+		newJoin = state.Join{
+			Term: 1,
+		}
+	} else {
+		newJoin = *join
+	}
 
 	joinRequest := JoinRequest{
 		SourceNode:  h.transportService.GetLocalNode(),
 		MinimumTerm: term,
-		Join:        *join,
+		Join:        newJoin,
 	}
 
-	logrus.Infof("SendJoinRequest: Attempting to join %v with %v\n", destination, joinRequest)
+	logrus.Infof("SendJoinRequest: Attempting to join=%v with joinRequest=%v\n", destination, joinRequest)
 
 	request := joinRequest.ToBytes()
 
 	remoteAddress := destination.HostAddress
-	if h.transportService.IsConnected(remoteAddress) == false {
-		h.transportService.ConnectToRemoteNode(remoteAddress, func(node *state.Node) {
-			h.transportService.SendRequest(*node, transport.JOIN_REQ, request, func(res []byte) {
-				logrus.Infof("Successfully joined %v with %v\n", destination, joinRequest)
-			})
-		})
-	} else {
-		h.transportService.SendRequest(destination, transport.JOIN_REQ, request, func(res []byte) {
+
+	h.transportService.ConnectToRemoteNode(remoteAddress, func(node *state.Node) {
+		h.transportService.SendRequest(*node, transport.JOIN_REQ, request, func(res []byte) {
 			logrus.Infof("Successfully joined %v with %v\n", destination, joinRequest)
 		})
-	}
-
+	})
 }
 
 type JoinAccumulator interface {
@@ -127,6 +131,10 @@ func (r *JoinRequest) ToBytes() []byte {
 		logrus.Fatal(err)
 	}
 	return buffer.Bytes()
+}
+
+func (r *JoinRequest) GetTerm() int64 {
+	return common.GetMaxInt(r.MinimumTerm, r.Join.Term)
 }
 
 func JoinRequestFromBytes(b []byte) *JoinRequest {
