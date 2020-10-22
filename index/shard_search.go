@@ -109,7 +109,6 @@ func SearchTypeBool(searchType interface{}) *query.BooleanQuery {
 	searchQuery := bleve.NewBooleanQuery()
 	var mustSearch, mustNotSearch, shouldSearch map[string]interface{}
 	for key, value := range m {
-		fmt.Println(strings.ToUpper(key))
 		switch key {
 		case "must", "filter":
 			queryMap, ok := value.([]interface{})
@@ -135,7 +134,6 @@ func SearchTypeBool(searchType interface{}) *query.BooleanQuery {
 		}
 	}
 	for key, value := range mustSearch {
-		fmt.Println(strings.ToUpper(key))
 		switch key {
 		case "match", "term":
 			searchQuery.AddMust(SearchTypeMatch(value))
@@ -154,7 +152,6 @@ func SearchTypeBool(searchType interface{}) *query.BooleanQuery {
 		}
 	}
 	for key, value := range mustNotSearch {
-		fmt.Println(strings.ToUpper(key))
 		switch key {
 		case "match", "term":
 			searchQuery.AddMustNot(SearchTypeMatch(value))
@@ -173,7 +170,6 @@ func SearchTypeBool(searchType interface{}) *query.BooleanQuery {
 		}
 	}
 	for key, value := range shouldSearch {
-		fmt.Println(strings.ToUpper(key))
 		switch key {
 		case "match", "term":
 			searchQuery.AddShould(SearchTypeMatch(value))
