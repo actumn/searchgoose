@@ -64,7 +64,7 @@ func (h *RestGetSource) Handle(r *RestRequest, reply ResponseListener) {
 		Id:      documentId,
 		ShardId: shardRouting.ShardId,
 	}
-	h.transportService.SendRequest(*clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
+	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], GetAction, getRequest.toBytes(), func(response []byte) {
 		res := getResponseFromBytes(response)
 		if res.Err != "" {
 			logrus.Warn(errors.New(res.Err))
