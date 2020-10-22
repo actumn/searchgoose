@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"io"
 	"net"
 	"strings"
@@ -91,16 +90,14 @@ func (c *ReplyChannel) GetDestAddress() string {
 	return c.destAddress
 }
 
-func NewTransport() *Transport {
+func NewTransport(hostAddress string, seedHost string, nodeId string) *Transport {
 
-	host := viper.GetString("network.host")
-	port := viper.GetString("transport.port")
-	seedHost := viper.GetString("discovery.seed_hosts")
-	seedHosts := strings.Split(seedHost, ",")
-	nodeId := viper.GetString("node.id")
-
+	var seedHosts []string
+	if len(seedHost) > 0 {
+		seedHosts = strings.Split(seedHost, ",")
+	}
 	return &Transport{
-		LocalAddress:    host + ":" + port,
+		LocalAddress:    hostAddress,
 		LocalNodeId:     nodeId,
 		SeedHosts:       seedHosts,
 		RequestHandlers: make(map[string]transport.RequestHandler),

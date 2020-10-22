@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 	"runtime"
 	"strings"
-	"time"
+	//"time"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 
 func init() {
 	logrus.SetLevel(logrus.TraceLevel)
-	//logrus.SetReportCaller(true)
+	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
 		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
@@ -66,7 +66,11 @@ func start() {
 
 	var tcpTransport transport.Transport
 
-	tcpTransport = tcp.NewTransport()
+	host := viper.GetString("network.host") + ":" + viper.GetString("transport.port")
+	seedHost := viper.GetString("discovery.seed_hosts")
+	id := viper.GetString("node.id")
+	tcpTransport = tcp.NewTransport(host, seedHost, id)
+
 	transportService := transport.NewService(tcpTransport)
 	transportService.Start()
 
@@ -92,10 +96,10 @@ func start() {
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator.Start()
-	time.Sleep(time.Duration(15) * time.Second)
+	//time.Sleep(time.Duration(15) * time.Second)
 
 	coordinator.StartInitialJoin()
-	time.Sleep(time.Duration(1000) * time.Second)
+	//time.Sleep(time.Duration(1000) * time.Second)
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, clusterMetadataIndexAliasService, indicesService, transportService, indexNameExpressionResolver)
