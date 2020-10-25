@@ -18,6 +18,7 @@ require (
 	github.com/klauspost/compress v1.10.10 // indirect
 	github.com/nqd/flat v0.1.0
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
+	github.com/shirou/gopsutil v2.20.9+incompatible
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.4.0
