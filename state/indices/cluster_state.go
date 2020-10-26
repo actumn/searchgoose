@@ -51,11 +51,11 @@ func (s *ClusterStateService) createIndices(event state.ClusterChangedEvent) {
 			indexMetadata := clusterState.Metadata.Indices[index.Name]
 			indexService.UpdateMapping(indexMetadata)
 			logrus.Infof("Create new index shard - index name: %s, index uuid: %s, shard number: %d", index.Name, index.Uuid, shardRouting.ShardId.ShardId)
-			indexService.CreateShard(shardRouting.ShardId.ShardId)
+			indexService.CreateShard(shardRouting)
 		} else {
 			if _, exists := indexService.Shard(shardRouting.ShardId.ShardId); !exists {
 				logrus.Infof("Create existing index shard - index name: %s, index uuid: %s, shard number: %d", index.Name, index.Uuid, shardRouting.ShardId.ShardId)
-				indexService.CreateShard(shardRouting.ShardId.ShardId)
+				indexService.CreateShard(shardRouting)
 			}
 		}
 	}

@@ -31,21 +31,21 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 	// TODO :: resolve nodes list from cluster state and broadcasting
 	clusterState := h.clusterService.State()
 	var nodesList []map[string]interface{}
-	for _, node := range clusterState.Nodes.Nodes {
+	for n, node := range clusterState.Nodes.Nodes {
 		nodesList = append(nodesList, map[string]interface{}{
 			"id":         node.Id,
-			"m":          "*",
-			"n":          node.Name,
-			"u":          "44m",
-			"role":       "dilmrt",
-			"hc":         "156.8mb",
-			"hm":         "512mb",
-			"hp":         "30",
+			"m":          "*", // master
+			"n":          n + node.Name,
+			"u":          "44m",     // uptime
+			"role":       "dilmrt",  // monitor.role
+			"hc":         "156.8mb", // heap current
+			"hm":         "512mb",   // heap max
+			"hp":         "30",      // heap percent
 			"ip":         node.HostAddress,
-			"dt":         "468.4gb",
-			"du":         "267.4gb",
-			"disk.avail": "200.9gb",
-			"l":          "2.62",
+			"dt":         "468.4gb", // disk total
+			"du":         "267.4gb", // disk used
+			"disk.avail": "200.9gb", // disk available
+			"l":          "-1",      //
 		})
 	}
 	reply(RestResponse{

@@ -110,14 +110,25 @@ func New(
 	c.pathTrie.insert("/_alias/{name}", actions.MethodHandlers{
 		actions.GET: actions.NewRestGetIndexAlias(clusterService, indexNameExpressionResolver),
 	})
-	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodes(clusterService),
-	})
 	c.pathTrie.insert("/_xpack", actions.MethodHandlers{
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/_stats", actions.MethodHandlers{
 		actions.GET: actions.NewRestIndicesStatsAction(clusterService, indicesService),
+	})
+
+	///////////////////////////// nodes ///////////////////////////////////
+	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
+		actions.GET: actions.NewRestNodes(clusterService),
+	})
+	c.pathTrie.insert("/_nodes/{nodeId}", actions.MethodHandlers{
+		actions.GET: actions.NewRestNodeId(),
+	})
+	c.pathTrie.insert("/_nodes/{nodeId}/_all", actions.MethodHandlers{
+		actions.GET: actions.NewRestNodeId(),
+	})
+	c.pathTrie.insert("/_nodes/{nodeId}/stats", actions.MethodHandlers{
+		actions.GET: actions.NewRestNodeId(),
 	})
 
 	///////////////////////////// cat /////////////////////////////////////
@@ -172,6 +183,9 @@ func New(
 	c.pathTrie.insert("/{index}/_refresh", actions.MethodHandlers{
 		actions.GET:  actions.NewRestRefresh(clusterService),
 		actions.POST: actions.NewRestRefresh(clusterService),
+	})
+	c.pathTrie.insert("/{index}/_stats", actions.MethodHandlers{
+		actions.GET: actions.NewRestIndexStats(),
 	})
 	//c.pathTrie.insert("/{index}/_bulk", actions.MethodHandlers{
 	//	actions.POST: ,

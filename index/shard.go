@@ -2,6 +2,7 @@ package index
 
 import (
 	"github.com/actumn/searchgoose/errors"
+	"github.com/actumn/searchgoose/state"
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index/scorch"
@@ -11,10 +12,11 @@ import (
 )
 
 type Shard struct {
-	engine bleve.Index
+	shardRouting state.ShardRouting
+	engine       bleve.Index
 }
 
-func NewShard(shardPath string, mapping mapping.IndexMapping) *Shard {
+func NewShard(shardRouting state.ShardRouting, shardPath string, mapping mapping.IndexMapping) *Shard {
 	index, err := bleve.NewUsing(shardPath, mapping, scorch.Name, scorch.Name, map[string]interface{}{
 		"create_if_missing": true,
 		"error_if_exists":   false,
@@ -24,7 +26,8 @@ func NewShard(shardPath string, mapping mapping.IndexMapping) *Shard {
 	}
 
 	return &Shard{
-		engine: index,
+		shardRouting: shardRouting,
+		engine:       index,
 	}
 }
 
@@ -95,19 +98,21 @@ func (s *Shard) Search(searchRequest *bleve.SearchRequest) (*bleve.SearchResult,
 	return searchResult, nil
 }
 
-func (s *Shard) Stats() *Stats {
-	statsMap := s.engine.StatsMap()
+func (s *Shard) Stats() Stats {
+	statsMap := s.engine.StatsMap()["index"].(map[string]interface{})
 	numDocs, err := s.engine.DocCount()
 	if err != nil {
 		logrus.Fatalln(err)
 	}
-	return &Stats{
-		UserData: statsMap,
-		NumDocs:  numDocs,
+	return Stats{
+		UserData:     statsMap,
+		NumDocs:      numDocs,
+		ShardRouting: s.shardRouting,
 	}
 }
 
 type Stats struct {
-	UserData map[string]interface{}
-	NumDocs  uint64
+	UserData     map[string]interface{}
+	NumDocs      uint64
+	ShardRouting state.ShardRouting
 }

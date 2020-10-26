@@ -195,7 +195,7 @@ func NewRestHeadIndex(clusterService *cluster.Service, indexNameExpressionResolv
 }
 
 func (h *RestHeadIndex) Handle(r *RestRequest, reply ResponseListener) {
-	// TODO:: forward to master if local node is data node
+	// TODO:: forward to master if local monitor is data monitor
 	//indicesExpressions := strings.Split(, ",")
 	indexExpression := r.PathParams["index"]
 	clusterState := h.clusterService.State()
@@ -212,4 +212,15 @@ func (h *RestHeadIndex) Handle(r *RestRequest, reply ResponseListener) {
 		StatusCode: 200,
 		Body:       "",
 	})
+}
+
+type RestIndexStats struct {
+}
+
+func NewRestIndexStats() *RestIndexStats {
+	return &RestIndexStats{}
+}
+
+func (h *RestIndexStats) Handle(r *RestRequest, reply ResponseListener) {
+
 }

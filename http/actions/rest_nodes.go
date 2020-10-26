@@ -30,3 +30,14 @@ func (h *RestNodes) Handle(r *RestRequest, reply ResponseListener) {
 		},
 	})
 }
+
+type RestNodeId struct {
+}
+
+func NewRestNodeId() *RestNodeId {
+	return &RestNodeId{}
+}
+
+func (h *RestNodeId) Handle(r *RestRequest, reply ResponseListener) {
+
+}

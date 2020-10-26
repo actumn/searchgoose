@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"github.com/actumn/searchgoose/index"
+	"github.com/actumn/searchgoose/monitor"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
 	"strconv"
+	"sync"
 )
 
 const (
@@ -145,19 +148,51 @@ func clusterStatsNodeRequestFromBytes(b []byte) *clusterStatsNodeRequest {
 	return &req
 }
 
+type clusterStatsNodeResponse struct {
+	NodeStats  monitor.Stats
+	ShardStats []index.Stats
+}
+
+func (r *clusterStatsNodeResponse) toBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		logrus.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+func clusterStatsNodeResponseFromBytes(b []byte) *clusterStatsNodeResponse {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var req clusterStatsNodeResponse
+	if err := decoder.Decode(&req); err != nil {
+		logrus.Fatal(err)
+	}
+	return &req
+}
+
 type RestClusterStats struct {
 	clusterService   *cluster.Service
 	transportService *transport.Service
 }
 
 func NewRestClusterStats(clusterService *cluster.Service, transportService *transport.Service, indicesService *indices.Service) *RestClusterStats {
-	transportService.RegisterRequestHandler(ClusterStatsAction, func(channel transport.ReplyChannel, req []byte) {
+	monitorService := monitor.NewService()
 
+	transportService.RegisterRequestHandler(ClusterStatsAction, func(channel transport.ReplyChannel, req []byte) {
+		nodeStats := monitorService.Stats()
+		var shardStats []index.Stats
 		for _, indexService := range indicesService.Indices {
 			for _, shard := range indexService.Shards {
-				shard.Stats()
+				shardStats = append(shardStats, shard.Stats())
 			}
 		}
+
+		res := clusterStatsNodeResponse{
+			NodeStats:  nodeStats,
+			ShardStats: shardStats,
+		}
+		channel.SendMessage("", res.toBytes())
 	})
 
 	return &RestClusterStats{
@@ -171,24 +206,52 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 	clusterState := h.clusterService.State()
 	nodes := clusterState.Nodes
 
-	indicesMap := map[string]interface{}{
-		"count":  1,
-		"shards": map[string]interface{}{},
-		"docs": map[string]interface{}{
-			"count":   1,
-			"deleted": 0,
-		},
-		"mappings": map[string]interface{}{
-			"field_types": []interface{}{},
-		},
+	responses := make([]clusterStatsNodeResponse, len(nodes.Nodes))
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodes.Nodes))
+	idx := 0
+	for _, node := range nodes.Nodes {
+		h.transportService.SendRequest(node, ClusterStatsAction, []byte(""), func(response []byte) {
+			res := clusterStatsNodeResponseFromBytes(response)
+			responses[idx] = *res
+			wg.Done()
+		})
+		idx += 1
 	}
-	nodesMap := map[string]interface{}{
-		"count": map[string]interface{}{
-			"total":  1,
-			"master": 1,
-			"data":   1,
-		},
+	wg.Wait()
+
+	memTotal := uint64(0)
+	memFree := uint64(0)
+
+	fsTotal := uint64(0)
+	fsFree := uint64(0)
+	fsAvailable := uint64(0)
+
+	indicesCount := map[string]struct{}{}
+	shards := 0
+	primaries := 0
+	docs := uint64(0)
+	numBytesUsedDisk := uint64(0)
+	for _, response := range responses {
+		memTotal += response.NodeStats.OsStats.MemTotal
+		memFree += response.NodeStats.OsStats.MemFree
+
+		fsTotal += response.NodeStats.FsStats.Total
+		fsFree += response.NodeStats.FsStats.Free
+		fsAvailable += response.NodeStats.FsStats.Available
+
+		for _, shardStat := range response.ShardStats {
+			docs += shardStat.NumDocs
+
+			indicesCount[shardStat.ShardRouting.ShardId.Index.Name] = struct{}{}
+			shards += 1
+			if shardStat.ShardRouting.Primary {
+				primaries += 1
+			}
+			numBytesUsedDisk += shardStat.UserData["num_bytes_used_disk"].(uint64)
+		}
 	}
+
 	reply(RestResponse{
 		StatusCode: 200,
 		Body: map[string]interface{}{
@@ -200,8 +263,41 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 			"cluster_name": clusterState.Name,
 			"cluster_uuid": clusterState.StateUUID,
 			"status":       "green",
-			"indices":      indicesMap,
-			"nodes":        nodesMap,
+			"indices": map[string]interface{}{
+				"count": len(indicesCount),
+				"shards": map[string]interface{}{
+					"total":     shards,
+					"primaries": primaries,
+				},
+				"docs": map[string]interface{}{
+					"count":   docs,
+					"deleted": -1,
+				},
+				"store": map[string]interface{}{
+					"size_in_bytes": numBytesUsedDisk,
+				},
+			},
+			"nodes": map[string]interface{}{
+				"count": map[string]interface{}{
+					"total":  len(nodes.Nodes),
+					"master": 1,
+					"data":   len(nodes.DataNodes),
+				},
+				"os": map[string]interface{}{
+					"mem": map[string]interface{}{
+						"total_in_bytes": memTotal,
+						"free_in_bytes":  memFree,
+						"used_in_bytes":  memTotal - memFree,
+						"free_percent":   memFree * 100 / memTotal,
+						"used_percent":   100 - memFree*100/memTotal,
+					},
+				},
+				"fs": map[string]interface{}{
+					"total_in_bytes":     fsTotal,
+					"free_in_bytes":      fsFree,
+					"available_in_bytes": fsAvailable,
+				},
+			},
 		},
 	})
 }
