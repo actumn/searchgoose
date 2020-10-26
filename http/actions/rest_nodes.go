@@ -41,3 +41,14 @@ func NewRestNodeId() *RestNodeId {
 func (h *RestNodeId) Handle(r *RestRequest, reply ResponseListener) {
 
 }
+
+type RestNodesStats struct {
+}
+
+func NewRestNodesStats() *RestNodesStats {
+	return &RestNodesStats{}
+}
+
+func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
+
+}

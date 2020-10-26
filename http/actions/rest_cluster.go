@@ -150,7 +150,7 @@ func clusterStatsNodeRequestFromBytes(b []byte) *clusterStatsNodeRequest {
 
 type clusterStatsNodeResponse struct {
 	NodeStats  monitor.Stats
-	ShardStats []index.Stats
+	ShardStats []index.ShardStats
 }
 
 func (r *clusterStatsNodeResponse) toBytes() []byte {
@@ -181,7 +181,7 @@ func NewRestClusterStats(clusterService *cluster.Service, transportService *tran
 
 	transportService.RegisterRequestHandler(ClusterStatsAction, func(channel transport.ReplyChannel, req []byte) {
 		nodeStats := monitorService.Stats()
-		var shardStats []index.Stats
+		var shardStats []index.ShardStats
 		for _, indexService := range indicesService.Indices {
 			for _, shard := range indexService.Shards {
 				shardStats = append(shardStats, shard.Stats())
@@ -209,14 +209,16 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 	responses := make([]clusterStatsNodeResponse, len(nodes.Nodes))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodes.Nodes))
-	idx := 0
+	idx := -1
 	for _, node := range nodes.Nodes {
-		h.transportService.SendRequest(node, ClusterStatsAction, []byte(""), func(response []byte) {
-			res := clusterStatsNodeResponseFromBytes(response)
-			responses[idx] = *res
-			wg.Done()
-		})
 		idx += 1
+		func(idx int) {
+			h.transportService.SendRequest(node, ClusterStatsAction, []byte(""), func(response []byte) {
+				res := clusterStatsNodeResponseFromBytes(response)
+				responses[idx] = *res
+				wg.Done()
+			})
+		}(idx)
 	}
 	wg.Wait()
 

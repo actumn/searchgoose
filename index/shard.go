@@ -98,21 +98,27 @@ func (s *Shard) Search(searchRequest *bleve.SearchRequest) (*bleve.SearchResult,
 	return searchResult, nil
 }
 
-func (s *Shard) Stats() Stats {
+func (s *Shard) Stats() ShardStats {
 	statsMap := s.engine.StatsMap()["index"].(map[string]interface{})
 	numDocs, err := s.engine.DocCount()
 	if err != nil {
 		logrus.Fatalln(err)
 	}
-	return Stats{
+	return ShardStats{
 		UserData:     statsMap,
 		NumDocs:      numDocs,
 		ShardRouting: s.shardRouting,
 	}
 }
 
-type Stats struct {
+type ShardStats struct {
 	UserData     map[string]interface{}
 	NumDocs      uint64
 	ShardRouting state.ShardRouting
+}
+
+type Stats struct {
+	Name       string
+	Uuid       string
+	ShardStats []ShardStats
 }

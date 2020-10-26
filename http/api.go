@@ -114,7 +114,7 @@ func New(
 		actions.GET: &actions.RestXpack{},
 	})
 	c.pathTrie.insert("/_stats", actions.MethodHandlers{
-		actions.GET: actions.NewRestIndicesStatsAction(clusterService, indicesService),
+		actions.GET: actions.NewRestIndicesStatsAction(clusterService, indicesService, indexNameExpressionResolver, transportService),
 	})
 
 	///////////////////////////// nodes ///////////////////////////////////
@@ -129,6 +129,12 @@ func New(
 	})
 	c.pathTrie.insert("/_nodes/{nodeId}/stats", actions.MethodHandlers{
 		actions.GET: actions.NewRestNodeId(),
+	})
+	c.pathTrie.insert("/_nodes/stats", actions.MethodHandlers{
+		actions.GET: actions.NewRestNodesStats(),
+	})
+	c.pathTrie.insert("/_nodes/stats/{metric}", actions.MethodHandlers{
+		actions.GET: actions.NewRestNodesStats(),
 	})
 
 	///////////////////////////// cat /////////////////////////////////////

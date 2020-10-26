@@ -74,16 +74,16 @@ func (h *RestCatIndices) Handle(r *RestRequest, reply ResponseListener) {
 	for _, indexMetadata := range clusterState.Metadata.Indices {
 		// TODO :: resolve indices information from broadcasting
 		indicesList = append(indicesList, map[string]interface{}{
-			"health":         "green",
-			"status":         "open",
-			"index":          indexMetadata.Index.Name,
-			"uuid":           indexMetadata.Index.Uuid,
-			"pri":            "1",
-			"rep":            "0",
-			"docs.count":     "0",
-			"docs.deleted":   "0",
-			"store.size":     "208b",
-			"pri.store.size": "208b",
+			"health": "green",
+			"status": "open",
+			"index":  indexMetadata.Index.Name,
+			"uuid":   indexMetadata.Index.Uuid,
+			//"pri":            "1",
+			//"rep":            "0",
+			//"docs.count":     "100",
+			//"docs.deleted":   "0",
+			//"store.size":     "208b",
+			//"pri.store.size": "208b",
 		})
 	}
 
