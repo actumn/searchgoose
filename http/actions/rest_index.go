@@ -213,14 +213,3 @@ func (h *RestHeadIndex) Handle(r *RestRequest, reply ResponseListener) {
 		Body:       "",
 	})
 }
-
-type RestIndexStats struct {
-}
-
-func NewRestIndexStats() *RestIndexStats {
-	return &RestIndexStats{}
-}
-
-func (h *RestIndexStats) Handle(r *RestRequest, reply ResponseListener) {
-
-}

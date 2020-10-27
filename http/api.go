@@ -113,28 +113,28 @@ func New(
 	c.pathTrie.insert("/_xpack", actions.MethodHandlers{
 		actions.GET: &actions.RestXpack{},
 	})
-	c.pathTrie.insert("/_stats", actions.MethodHandlers{
-		actions.GET: actions.NewRestIndicesStatsAction(clusterService, indicesService, indexNameExpressionResolver, transportService),
-	})
 
 	///////////////////////////// nodes ///////////////////////////////////
+	nodeInfosAction := actions.NewRestNodesInfo(clusterService, transportService)
 	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodes(clusterService),
+		actions.GET: nodeInfosAction,
 	})
 	c.pathTrie.insert("/_nodes/{nodeId}", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodeId(),
+		actions.GET: nodeInfosAction,
 	})
 	c.pathTrie.insert("/_nodes/{nodeId}/_all", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodeId(),
+		actions.GET: nodeInfosAction,
 	})
+
+	nodeStatsAction := actions.NewRestNodesStats(clusterService, transportService)
 	c.pathTrie.insert("/_nodes/{nodeId}/stats", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodeId(),
+		actions.GET: nodeStatsAction,
 	})
 	c.pathTrie.insert("/_nodes/stats", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodesStats(),
+		actions.GET: nodeStatsAction,
 	})
 	c.pathTrie.insert("/_nodes/stats/{metric}", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodesStats(),
+		actions.GET: nodeStatsAction,
 	})
 
 	///////////////////////////// cat /////////////////////////////////////
@@ -190,8 +190,13 @@ func New(
 		actions.GET:  actions.NewRestRefresh(clusterService),
 		actions.POST: actions.NewRestRefresh(clusterService),
 	})
+
+	indicesStatsAction := actions.NewRestIndicesStatsAction(clusterService, indicesService, indexNameExpressionResolver, transportService)
+	c.pathTrie.insert("/_stats", actions.MethodHandlers{
+		actions.GET: indicesStatsAction,
+	})
 	c.pathTrie.insert("/{index}/_stats", actions.MethodHandlers{
-		actions.GET: actions.NewRestIndexStats(),
+		actions.GET: indicesStatsAction,
 	})
 	//c.pathTrie.insert("/{index}/_bulk", actions.MethodHandlers{
 	//	actions.POST: ,

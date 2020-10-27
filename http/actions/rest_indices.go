@@ -99,9 +99,13 @@ func NewRestIndicesStatsAction(clusterService *cluster.Service, indicesService *
 }
 
 func (h *RestIndicesStatsAction) Handle(r *RestRequest, reply ResponseListener) {
+	indexExpression := r.PathParams["index"]
+	if indexExpression == "" {
+		indexExpression = "*"
+	}
 	clusterState := h.clusterService.State()
 
-	concreteIndices := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, "*")
+	concreteIndices := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, indexExpression)
 	nodeIds := map[string][]state.ShardRouting{}
 	for _, indexName := range concreteIndices {
 		indexRoutingTable := clusterState.RoutingTable.IndicesRouting[indexName]

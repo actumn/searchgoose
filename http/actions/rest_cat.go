@@ -1,46 +1,14 @@
 package actions
 
 import (
-	"bytes"
-	"encoding/gob"
 	"github.com/actumn/searchgoose/common"
 	"github.com/actumn/searchgoose/monitor"
-	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/actumn/searchgoose/state/transport"
-	"github.com/sirupsen/logrus"
 	"strconv"
 	"sync"
 )
-
-const (
-	NodeStatsAction = "cluster:monitor/nodes/stats"
-)
-
-type nodeResponse struct {
-	Node      state.Node
-	NodeStats monitor.Stats
-}
-
-func (r *nodeResponse) toBytes() []byte {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	if err := enc.Encode(r); err != nil {
-		logrus.Fatal(err)
-	}
-	return buffer.Bytes()
-}
-
-func nodeResponseFromBytes(b []byte) *nodeResponse {
-	buffer := bytes.NewBuffer(b)
-	decoder := gob.NewDecoder(buffer)
-	var req nodeResponse
-	if err := decoder.Decode(&req); err != nil {
-		logrus.Fatal(err)
-	}
-	return &req
-}
 
 type RestCatTemplates struct{}
 
@@ -57,17 +25,6 @@ type RestCatNodes struct {
 }
 
 func NewRestCatNodes(clusterService *cluster.Service, transportService *transport.Service) *RestCatNodes {
-	monitorService := monitor.NewService()
-	transportService.RegisterRequestHandler(NodeStatsAction, func(channel transport.ReplyChannel, req []byte) {
-		stats := monitorService.Stats()
-
-		nodeRes := nodeResponse{
-			Node:      *transportService.LocalNode,
-			NodeStats: stats,
-		}
-		channel.SendMessage("", nodeRes.toBytes())
-	})
-
 	return &RestCatNodes{
 		clusterService:   clusterService,
 		transportService: transportService,
@@ -78,7 +35,7 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 	clusterState := h.clusterService.State()
 
 	nodes := clusterState.Nodes.Nodes
-	responses := make([]nodeResponse, len(nodes))
+	responses := make([]nodeStatsResponse, len(nodes))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodes))
 	idx := -1
@@ -86,8 +43,8 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 		idx += 1
 		currIdx := idx
 		h.transportService.SendRequest(node, NodeStatsAction, []byte(""), func(response []byte) {
-			nodeRes := nodeResponseFromBytes(response)
-			responses[currIdx] = *nodeRes
+			nodeStatsRes := nodeStatsResponseFromBytes(response)
+			responses[currIdx] = *nodeStatsRes
 			wg.Done()
 		})
 	}
