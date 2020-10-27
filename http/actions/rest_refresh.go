@@ -13,7 +13,7 @@ func NewRestRefresh(clusterService *cluster.Service) *RestRefresh {
 }
 
 func (h *RestRefresh) Handle(r *RestRequest, reply ResponseListener) {
-	// TODO:: boradcast request and reply appropriate response
+	// TODO:: broadcast request and reply appropriate response
 	index := r.PathParams["index"]
 	clusterState := h.clusterService.State()
 	shardCount := clusterState.Metadata.Indices[index].NumberOfShards

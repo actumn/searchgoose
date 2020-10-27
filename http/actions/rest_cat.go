@@ -1,10 +1,46 @@
 package actions
 
 import (
+	"bytes"
+	"encoding/gob"
+	"github.com/actumn/searchgoose/common"
+	"github.com/actumn/searchgoose/monitor"
+	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/actumn/searchgoose/state/transport"
+	"github.com/sirupsen/logrus"
+	"strconv"
+	"sync"
 )
+
+const (
+	NodeStatsAction = "cluster:monitor/nodes/stats"
+)
+
+type nodeResponse struct {
+	Node      state.Node
+	NodeStats monitor.Stats
+}
+
+func (r *nodeResponse) toBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		logrus.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func nodeResponseFromBytes(b []byte) *nodeResponse {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var req nodeResponse
+	if err := decoder.Decode(&req); err != nil {
+		logrus.Fatal(err)
+	}
+	return &req
+}
 
 type RestCatTemplates struct{}
 
@@ -21,6 +57,17 @@ type RestCatNodes struct {
 }
 
 func NewRestCatNodes(clusterService *cluster.Service, transportService *transport.Service) *RestCatNodes {
+	monitorService := monitor.NewService()
+	transportService.RegisterRequestHandler(NodeStatsAction, func(channel transport.ReplyChannel, req []byte) {
+		stats := monitorService.Stats()
+
+		nodeRes := nodeResponse{
+			Node:      *transportService.LocalNode,
+			NodeStats: stats,
+		}
+		channel.SendMessage("", nodeRes.toBytes())
+	})
+
 	return &RestCatNodes{
 		clusterService:   clusterService,
 		transportService: transportService,
@@ -28,24 +75,47 @@ func NewRestCatNodes(clusterService *cluster.Service, transportService *transpor
 }
 
 func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
-	// TODO :: resolve nodes list from cluster state and broadcasting
 	clusterState := h.clusterService.State()
+
+	nodes := clusterState.Nodes.Nodes
+	responses := make([]nodeResponse, len(nodes))
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodes))
+	idx := -1
+	for _, node := range nodes {
+		idx += 1
+		currIdx := idx
+		h.transportService.SendRequest(node, NodeStatsAction, []byte(""), func(response []byte) {
+			nodeRes := nodeResponseFromBytes(response)
+			responses[currIdx] = *nodeRes
+			wg.Done()
+		})
+	}
+	wg.Wait()
+
+	nodeStatsMap := map[string]monitor.Stats{}
+	for _, response := range responses {
+		nodeStatsMap[response.Node.Id] = response.NodeStats
+	}
+
 	var nodesList []map[string]interface{}
 	for n, node := range clusterState.Nodes.Nodes {
+		nodeStat := nodeStatsMap[node.Id]
+		heapPer := nodeStat.MemStats.Alloc * 100 / nodeStat.MemStats.Sys
 		nodesList = append(nodesList, map[string]interface{}{
-			"id":         node.Id,
-			"m":          "*", // master
-			"n":          n + node.Name,
-			"u":          "44m",     // uptime
-			"role":       "dilmrt",  // monitor.role
-			"hc":         "156.8mb", // heap current
-			"hm":         "512mb",   // heap max
-			"hp":         "30",      // heap percent
-			"ip":         node.HostAddress,
-			"dt":         "468.4gb", // disk total
-			"du":         "267.4gb", // disk used
-			"disk.avail": "200.9gb", // disk available
-			"l":          "-1",      //
+			"id":   node.Id,
+			"m":    "*", // master
+			"n":    n + node.Name,
+			"u":    "44m",    // uptime
+			"role": "dilmrt", // node role
+			//"hc":         "156.8mb", // heap current
+			//"hm":         "512mb",   // heap max
+			"hp": strconv.FormatUint(heapPer, 10), // heap percent
+			"ip": node.HostAddress[0 : len(node.HostAddress)-5],
+			//"dt":         "468.4gb", // disk total
+			//"du":         "267.4gb", // disk used
+			"disk.avail": common.IBytes(nodeStat.FsStats.Available), // disk available
+			"l":          "-1",                                      //
 		})
 	}
 	reply(RestResponse{
@@ -70,7 +140,7 @@ func NewRestCatIndices(clusterService *cluster.Service, indexNameExpressionResol
 
 func (h *RestCatIndices) Handle(r *RestRequest, reply ResponseListener) {
 	clusterState := h.clusterService.State()
-	indicesList := []map[string]interface{}{}
+	var indicesList []map[string]interface{}
 	for _, indexMetadata := range clusterState.Metadata.Indices {
 		// TODO :: resolve indices information from broadcasting
 		indicesList = append(indicesList, map[string]interface{}{

@@ -3,6 +3,7 @@ package monitor
 import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
+	"runtime"
 )
 
 type Service struct {
@@ -13,8 +14,13 @@ func NewService() *Service {
 }
 
 type Stats struct {
-	OsStats OsStats
-	FsStats FsStats
+	MemStats MemStats
+	OsStats  OsStats
+	FsStats  FsStats
+}
+type MemStats struct {
+	Alloc uint64
+	Sys   uint64
 }
 type OsStats struct {
 	MemTotal uint64
@@ -36,6 +42,9 @@ func (s *Service) Stats() Stats {
 	//hostInfo, _ := host.Info()
 	//fmt.Println(hostInfo)
 
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
 	memstats, _ := mem.VirtualMemory()
 	//fmt.Println(memstats)
 
@@ -43,6 +52,10 @@ func (s *Service) Stats() Stats {
 	//fmt.Println(diskStats)
 
 	return Stats{
+		MemStats: MemStats{
+			Alloc: m.Alloc,
+			Sys:   m.Sys,
+		},
 		OsStats: OsStats{
 			MemTotal: memstats.Total,
 			MemFree:  memstats.Free,

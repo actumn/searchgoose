@@ -16,12 +16,12 @@ const (
 	IndicesStatsAction = "indices:monitor/stats"
 )
 
-type nodeRequest struct {
+type indicesStatsRequest struct {
 	NodeId string
 	Shards []state.ShardRouting
 }
 
-func (r *nodeRequest) toBytes() []byte {
+func (r *indicesStatsRequest) toBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
@@ -30,22 +30,22 @@ func (r *nodeRequest) toBytes() []byte {
 	return buffer.Bytes()
 }
 
-func nodeRequestFromBytes(b []byte) *nodeRequest {
+func indicesStatsRequestFromBytes(b []byte) *indicesStatsRequest {
 	buffer := bytes.NewBuffer(b)
 	decoder := gob.NewDecoder(buffer)
-	var req nodeRequest
+	var req indicesStatsRequest
 	if err := decoder.Decode(&req); err != nil {
 		logrus.Fatal(err)
 	}
 	return &req
 }
 
-type nodeResponse struct {
+type indicesStatsResponse struct {
 	TotalShards int
 	ShardStats  []index.ShardStats
 }
 
-func (r *nodeResponse) toBytes() []byte {
+func (r *indicesStatsResponse) toBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
@@ -54,10 +54,10 @@ func (r *nodeResponse) toBytes() []byte {
 	return buffer.Bytes()
 }
 
-func nodeResponseFromBytes(b []byte) *nodeResponse {
+func indicesStatsResponseFromBytes(b []byte) *indicesStatsResponse {
 	buffer := bytes.NewBuffer(b)
 	decoder := gob.NewDecoder(buffer)
-	var req nodeResponse
+	var req indicesStatsResponse
 	if err := decoder.Decode(&req); err != nil {
 		logrus.Fatal(err)
 	}
@@ -73,21 +73,21 @@ type RestIndicesStatsAction struct {
 
 func NewRestIndicesStatsAction(clusterService *cluster.Service, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndicesStatsAction {
 	transportService.RegisterRequestHandler(IndicesStatsAction, func(channel transport.ReplyChannel, req []byte) {
-		nodeReq := nodeRequestFromBytes(req)
+		indicesStatsReq := indicesStatsRequestFromBytes(req)
 		var shardStats []index.ShardStats
 
-		for _, shardRouting := range nodeReq.Shards {
+		for _, shardRouting := range indicesStatsReq.Shards {
 			indexService := indicesService.Indices[shardRouting.ShardId.Index.Uuid]
 			indexShard, _ := indexService.Shard(shardRouting.ShardId.ShardId)
 			shardStats = append(shardStats, indexShard.Stats())
 		}
 
-		nodeRes := nodeResponse{
-			TotalShards: len(nodeReq.Shards),
+		indicesStatsRes := indicesStatsResponse{
+			TotalShards: len(indicesStatsReq.Shards),
 			ShardStats:  shardStats,
 		}
 
-		channel.SendMessage("", nodeRes.toBytes())
+		channel.SendMessage("", indicesStatsRes.toBytes())
 	})
 
 	return &RestIndicesStatsAction{
@@ -99,7 +99,6 @@ func NewRestIndicesStatsAction(clusterService *cluster.Service, indicesService *
 }
 
 func (h *RestIndicesStatsAction) Handle(r *RestRequest, reply ResponseListener) {
-	// TODO:: reply based on indices service and all cluster shards information
 	clusterState := h.clusterService.State()
 
 	concreteIndices := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, "*")
@@ -137,24 +136,23 @@ func (h *RestIndicesStatsAction) Handle(r *RestRequest, reply ResponseListener) 
 		return
 	}
 
-	responses := make([]nodeResponse, len(nodeIds))
+	responses := make([]indicesStatsResponse, len(nodeIds))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodeIds))
 	idx := -1
 	for nodeId, shards := range nodeIds {
 		idx += 1
 		node := clusterState.Nodes.Nodes[nodeId]
-		nodeReq := nodeRequest{
+		indicesStatsReq := indicesStatsRequest{
 			NodeId: nodeId,
 			Shards: shards,
 		}
-		func(idx int) {
-			h.transportService.SendRequest(node, IndicesStatsAction, nodeReq.toBytes(), func(response []byte) {
-				nodeRes := nodeResponseFromBytes(response)
-				responses[idx] = *nodeRes
-				wg.Done()
-			})
-		}(idx)
+		currIdx := idx
+		h.transportService.SendRequest(node, IndicesStatsAction, indicesStatsReq.toBytes(), func(response []byte) {
+			indicesStatsRes := indicesStatsResponseFromBytes(response)
+			responses[currIdx] = *indicesStatsRes
+			wg.Done()
+		})
 	}
 	wg.Wait()
 
@@ -165,7 +163,11 @@ func (h *RestIndicesStatsAction) Handle(r *RestRequest, reply ResponseListener) 
 
 		for _, shardStat := range response.ShardStats {
 			if indexStats, existing := indicesStats[shardStat.ShardRouting.ShardId.Index.Name]; existing {
-				indexStats.ShardStats = append(indexStats.ShardStats, shardStat)
+				indicesStats[shardStat.ShardRouting.ShardId.Index.Name] = index.Stats{
+					Name:       shardStat.ShardRouting.ShardId.Index.Name,
+					Uuid:       shardStat.ShardRouting.ShardId.Index.Uuid,
+					ShardStats: append(indexStats.ShardStats, shardStat),
+				}
 			} else {
 				indicesStats[shardStat.ShardRouting.ShardId.Index.Name] = index.Stats{
 					Name:       shardStat.ShardRouting.ShardId.Index.Name,

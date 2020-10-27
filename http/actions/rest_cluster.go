@@ -202,7 +202,6 @@ func NewRestClusterStats(clusterService *cluster.Service, transportService *tran
 }
 
 func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
-	// TODO :: resolve nodes map, indices map from cluster state and broadcasting
 	clusterState := h.clusterService.State()
 	nodes := clusterState.Nodes
 
@@ -212,13 +211,12 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 	idx := -1
 	for _, node := range nodes.Nodes {
 		idx += 1
-		func(idx int) {
-			h.transportService.SendRequest(node, ClusterStatsAction, []byte(""), func(response []byte) {
-				res := clusterStatsNodeResponseFromBytes(response)
-				responses[idx] = *res
-				wg.Done()
-			})
-		}(idx)
+		currIdx := idx
+		h.transportService.SendRequest(node, ClusterStatsAction, []byte(""), func(response []byte) {
+			res := clusterStatsNodeResponseFromBytes(response)
+			responses[currIdx] = *res
+			wg.Done()
+		})
 	}
 	wg.Wait()
 
