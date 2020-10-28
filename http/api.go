@@ -155,8 +155,12 @@ func New(
 	c.pathTrie.insert("/_cluster/health", actions.MethodHandlers{
 		actions.GET: actions.NewRestClusterHealth(clusterService, indexNameExpressionResolver),
 	})
-	c.pathTrie.insert("/_cluster/state/metadata", actions.MethodHandlers{
-		actions.GET: actions.NewRestClusterStateMetadata(clusterService),
+	clusterStateAction := actions.NewRestClusterState(clusterService, indexNameExpressionResolver)
+	c.pathTrie.insert("/_cluster/state/{metric}", actions.MethodHandlers{
+		actions.GET: clusterStateAction,
+	})
+	c.pathTrie.insert("/_cluster/state/{metric}/{indices}", actions.MethodHandlers{
+		actions.GET: clusterStateAction,
 	})
 	c.pathTrie.insert("/_cluster/stats", actions.MethodHandlers{
 		actions.GET: actions.NewRestClusterStats(clusterService, transportService, indicesService),
@@ -204,6 +208,13 @@ func New(
 	//})
 	c.pathTrie.insert("/{index}/{type}/{id}/_source", actions.MethodHandlers{
 		actions.GET: actions.NewRestGetSource(clusterService, indicesService, indexNameExpressionResolver, transportService),
+	})
+	getMappingsAction := actions.NewRestGetMappings(clusterService, indexNameExpressionResolver)
+	c.pathTrie.insert("/_mapping", actions.MethodHandlers{
+		actions.GET: getMappingsAction,
+	})
+	c.pathTrie.insert("/{index}/_mapping", actions.MethodHandlers{
+		actions.GET: getMappingsAction,
 	})
 
 	s := &fasthttp.Server{
