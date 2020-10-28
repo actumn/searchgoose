@@ -11,10 +11,10 @@ import (
 )
 
 type Stats struct {
-	RuntimeStats RuntimeStats
-	OsStats      OsStats
-	FsStats      FsStats
-	ProcStats    ProcStats
+	Runtime RuntimeStats
+	Os      OsStats
+	Fs      FsStats
+	Proc    ProcStats
 }
 
 type RuntimeStats struct {
@@ -23,8 +23,8 @@ type RuntimeStats struct {
 }
 
 type OsStats struct {
-	CpuStats OsCpuStats
-	MemStats OsMemStats
+	Cpu OsCpuStats
+	Mem OsMemStats
 }
 type OsCpuStats struct {
 	Percent     float64
@@ -78,12 +78,12 @@ func (s *Service) Stats() Stats {
 	procPercent, _ := proc.Percent(0)
 
 	return Stats{
-		RuntimeStats: RuntimeStats{
+		Runtime: RuntimeStats{
 			HeapAlloc: m.HeapAlloc,
 			HeapSys:   m.HeapSys,
 		},
-		OsStats: OsStats{
-			CpuStats: OsCpuStats{
+		Os: OsStats{
+			Cpu: OsCpuStats{
 				Percent: percentages[0],
 				LoadAverage: OsCpuLoad{
 					Load1:  loadAvg.Load1,
@@ -91,17 +91,17 @@ func (s *Service) Stats() Stats {
 					Load15: loadAvg.Load15,
 				},
 			},
-			MemStats: OsMemStats{
+			Mem: OsMemStats{
 				Total: memstats.Total,
 				Free:  memstats.Free,
 			},
 		},
-		FsStats: FsStats{
+		Fs: FsStats{
 			Total:     diskStats.Total,
 			Free:      diskStats.Total - diskStats.Used,
 			Available: diskStats.Free,
 		},
-		ProcStats: ProcStats{
+		Proc: ProcStats{
 			NumFDs:          procFd,
 			CpuPercent:      procPercent,
 			MemTotalVirtual: memstats.VMallocTotal,

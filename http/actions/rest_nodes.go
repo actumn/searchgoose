@@ -8,6 +8,7 @@ import (
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
+	"os"
 	"sync"
 )
 
@@ -16,16 +17,46 @@ const (
 	NodesStatsAction = "cluster:monitor/nodes/stats"
 )
 
+type nodeInfoResponse struct {
+	Node     state.Node
+	NodeInfo monitor.Info
+}
+
+func (r *nodeInfoResponse) toBytes() []byte {
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	if err := enc.Encode(r); err != nil {
+		logrus.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func nodeInfoResponseFromBytes(b []byte) *nodeInfoResponse {
+	buffer := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(buffer)
+	var req nodeInfoResponse
+	if err := decoder.Decode(&req); err != nil {
+		logrus.Fatal(err)
+	}
+	return &req
+}
+
 type RestNodesInfo struct {
 	clusterService   *cluster.Service
 	transportService *transport.Service
 }
 
 func NewRestNodesInfo(clusterService *cluster.Service, transportService *transport.Service) *RestNodesInfo {
-	//monitorService := monitor.NewService()
-	//transportService.RegisterRequestHandler(NodesInfoAction, func(channel transport.ReplyChannel, req []byte) {
-	//
-	//})
+	monitorService := monitor.NewService()
+	transportService.RegisterRequestHandler(NodesInfoAction, func(channel transport.ReplyChannel, req []byte) {
+		info := monitorService.Info()
+
+		nodeRes := nodeInfoResponse{
+			Node:     *transportService.LocalNode,
+			NodeInfo: info,
+		}
+		channel.SendMessage("", nodeRes.toBytes())
+	})
 
 	return &RestNodesInfo{
 		clusterService:   clusterService,
@@ -61,13 +92,57 @@ func (h *RestNodesInfo) Handle(r *RestRequest, reply ResponseListener) {
 		return
 	}
 
+	responses := make([]nodeInfoResponse, len(nodes))
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodes))
+	idx := -1
+	for _, node := range nodes {
+		idx += 1
+		currIdx := idx
+		h.transportService.SendRequest(node, NodesInfoAction, []byte(""), func(response []byte) {
+			nodeStatsRes := nodeInfoResponseFromBytes(response)
+			responses[currIdx] = *nodeStatsRes
+			wg.Done()
+		})
+	}
+	wg.Wait()
+
+	wd, _ := os.Getwd()
 	nodesMap := map[string]interface{}{}
-	for _, node := range concreteNodes {
-		nodesMap[node.Id] = map[string]interface{}{
-			"ip":      node.HostAddress,
-			"version": "7.8.1",
+	for _, response := range responses {
+		nodesMap[response.Node.Id] = map[string]interface{}{
+			"transport_address": response.Node.HostAddress,
+			"host":              response.Node.HostAddress[0 : len(response.Node.HostAddress)-5],
+			"ip":                response.Node.HostAddress[0 : len(response.Node.HostAddress)-5],
+			"version":           "7.8.1",
+			"roles":             []string{"master", "data"},
+			"settings": map[string]interface{}{
+				"node": map[string]interface{}{
+					"master": true,
+					"data":   true,
+				},
+				"path": map[string]interface{}{
+					"data": []string{
+						wd + "/data",
+					},
+					"logs": wd + "/logs",
+					"home": wd,
+				},
+			},
+			"os": map[string]interface{}{
+				"name":                 response.NodeInfo.Os.Name,
+				"pretty_name":          response.NodeInfo.Os.Platform,
+				"arch":                 response.NodeInfo.Os.Arch,
+				"version":              response.NodeInfo.Os.Version,
+				"available_processors": response.NodeInfo.Os.Processors,
+				"allocated_processors": response.NodeInfo.Os.Processors,
+			},
+			"jvm": map[string]interface{}{
+				"pid":     response.NodeInfo.Runtime.Pid,
+				"version": response.NodeInfo.Runtime.Version,
+			},
 			"http": map[string]interface{}{
-				"public_address": node.HostAddress,
+				"publish_address": response.Node.HostAddress,
 			},
 		}
 	}
@@ -75,7 +150,13 @@ func (h *RestNodesInfo) Handle(r *RestRequest, reply ResponseListener) {
 	reply(RestResponse{
 		StatusCode: 200,
 		Body: map[string]interface{}{
-			"nodes": nodesMap,
+			"_nodes": map[string]interface{}{
+				"total":      len(nodes),
+				"successful": len(nodes),
+				"failed":     0,
+			},
+			"cluster_name": clusterState.Name,
+			"nodes":        nodesMap,
 		},
 	})
 }
@@ -179,43 +260,43 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 			"roles":             []string{"data", "master"},
 			"jvm": map[string]interface{}{
 				"mem": map[string]interface{}{
-					"heap_used_in_bytes": response.NodeStats.RuntimeStats.HeapAlloc,
-					"heap_max_in_bytes":  response.NodeStats.RuntimeStats.HeapSys,
-					"heap_used_percent":  response.NodeStats.RuntimeStats.HeapAlloc * 100 / response.NodeStats.RuntimeStats.HeapSys,
+					"heap_used_in_bytes": response.NodeStats.Runtime.HeapAlloc,
+					"heap_max_in_bytes":  response.NodeStats.Runtime.HeapSys,
+					"heap_used_percent":  response.NodeStats.Runtime.HeapAlloc * 100 / response.NodeStats.Runtime.HeapSys,
 				},
 			},
 			"os": map[string]interface{}{
 				"cpu": map[string]interface{}{
-					"percent": response.NodeStats.OsStats.CpuStats.Percent,
+					"percent": response.NodeStats.Os.Cpu.Percent,
 					"load_average": map[string]interface{}{
-						"1m":  response.NodeStats.OsStats.CpuStats.LoadAverage.Load1,
-						"5m":  response.NodeStats.OsStats.CpuStats.LoadAverage.Load5,
-						"15m": response.NodeStats.OsStats.CpuStats.LoadAverage.Load15,
+						"1m":  response.NodeStats.Os.Cpu.LoadAverage.Load1,
+						"5m":  response.NodeStats.Os.Cpu.LoadAverage.Load5,
+						"15m": response.NodeStats.Os.Cpu.LoadAverage.Load15,
 					},
 				},
 				"mem": map[string]interface{}{
-					"total_in_bytes": response.NodeStats.OsStats.MemStats.Total,
-					"free_in_bytes":  response.NodeStats.OsStats.MemStats.Free,
-					"used_in_bytes":  response.NodeStats.OsStats.MemStats.Total - response.NodeStats.OsStats.MemStats.Free,
-					"free_percent":   response.NodeStats.OsStats.MemStats.Free * 100 / response.NodeStats.OsStats.MemStats.Total,
-					"used_percent":   100 - response.NodeStats.OsStats.MemStats.Free*100/response.NodeStats.OsStats.MemStats.Total,
+					"total_in_bytes": response.NodeStats.Os.Mem.Total,
+					"free_in_bytes":  response.NodeStats.Os.Mem.Free,
+					"used_in_bytes":  response.NodeStats.Os.Mem.Total - response.NodeStats.Os.Mem.Free,
+					"free_percent":   response.NodeStats.Os.Mem.Free * 100 / response.NodeStats.Os.Mem.Total,
+					"used_percent":   100 - response.NodeStats.Os.Mem.Free*100/response.NodeStats.Os.Mem.Total,
 				},
 			},
 			"fs": map[string]interface{}{
 				"total": map[string]interface{}{
-					"total_in_bytes":     response.NodeStats.FsStats.Total,
-					"free_in_bytes":      response.NodeStats.FsStats.Free,
-					"available_in_bytes": response.NodeStats.FsStats.Available,
+					"total_in_bytes":     response.NodeStats.Fs.Total,
+					"free_in_bytes":      response.NodeStats.Fs.Free,
+					"available_in_bytes": response.NodeStats.Fs.Available,
 				},
 			},
 			"process": map[string]interface{}{
-				"open_file_descriptors": response.NodeStats.ProcStats.NumFDs,
+				"open_file_descriptors": response.NodeStats.Proc.NumFDs,
 				"max_file_descriptors":  -1,
 				"cpu": map[string]interface{}{
-					"percent": response.NodeStats.ProcStats.CpuPercent,
+					"percent": response.NodeStats.Proc.CpuPercent,
 				},
 				"mem": map[string]interface{}{
-					"total_virtual_in_bytes": response.NodeStats.ProcStats.MemTotalVirtual,
+					"total_virtual_in_bytes": response.NodeStats.Proc.MemTotalVirtual,
 				},
 			},
 		}

@@ -58,7 +58,7 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 	var nodesList []map[string]interface{}
 	for n, node := range clusterState.Nodes.Nodes {
 		nodeStat := nodeStatsMap[node.Id]
-		heapPer := nodeStat.RuntimeStats.HeapAlloc * 100 / nodeStat.RuntimeStats.HeapSys
+		heapPer := nodeStat.Runtime.HeapAlloc * 100 / nodeStat.Runtime.HeapSys
 		nodesList = append(nodesList, map[string]interface{}{
 			"id":   node.Id,
 			"m":    "*", // master
@@ -71,8 +71,8 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 			"ip": node.HostAddress[0 : len(node.HostAddress)-5],
 			//"dt":         "468.4gb", // disk total
 			//"du":         "267.4gb", // disk used
-			"disk.avail": common.IBytes(nodeStat.FsStats.Available), // disk available
-			"l":          "-1",                                      //
+			"disk.avail": common.IBytes(nodeStat.Fs.Available), // disk available
+			"l":          "-1",                                 //
 		})
 	}
 	reply(RestResponse{
