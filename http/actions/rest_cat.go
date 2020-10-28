@@ -42,7 +42,7 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 	for _, node := range nodes {
 		idx += 1
 		currIdx := idx
-		h.transportService.SendRequest(node, NodeStatsAction, []byte(""), func(response []byte) {
+		h.transportService.SendRequest(node, NodesStatsAction, []byte(""), func(response []byte) {
 			nodeStatsRes := nodeStatsResponseFromBytes(response)
 			responses[currIdx] = *nodeStatsRes
 			wg.Done()
@@ -58,7 +58,7 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 	var nodesList []map[string]interface{}
 	for n, node := range clusterState.Nodes.Nodes {
 		nodeStat := nodeStatsMap[node.Id]
-		heapPer := nodeStat.MemStats.Alloc * 100 / nodeStat.MemStats.Sys
+		heapPer := nodeStat.RuntimeStats.HeapAlloc * 100 / nodeStat.RuntimeStats.HeapSys
 		nodesList = append(nodesList, map[string]interface{}{
 			"id":   node.Id,
 			"m":    "*", // master

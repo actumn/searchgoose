@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	NodeStatsAction = "cluster:monitor/nodes/stats"
+	NodesInfoAction  = "cluster:monitor/nodes/info"
+	NodesStatsAction = "cluster:monitor/nodes/stats"
 )
 
 type RestNodesInfo struct {
@@ -21,6 +22,11 @@ type RestNodesInfo struct {
 }
 
 func NewRestNodesInfo(clusterService *cluster.Service, transportService *transport.Service) *RestNodesInfo {
+	//monitorService := monitor.NewService()
+	//transportService.RegisterRequestHandler(NodesInfoAction, func(channel transport.ReplyChannel, req []byte) {
+	//
+	//})
+
 	return &RestNodesInfo{
 		clusterService:   clusterService,
 		transportService: transportService,
@@ -105,7 +111,7 @@ type RestNodesStats struct {
 
 func NewRestNodesStats(clusterService *cluster.Service, transportService *transport.Service) *RestNodesStats {
 	monitorService := monitor.NewService()
-	transportService.RegisterRequestHandler(NodeStatsAction, func(channel transport.ReplyChannel, req []byte) {
+	transportService.RegisterRequestHandler(NodesStatsAction, func(channel transport.ReplyChannel, req []byte) {
 		stats := monitorService.Stats()
 
 		nodeRes := nodeStatsResponse{
@@ -156,7 +162,7 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 	for _, node := range nodes {
 		idx += 1
 		currIdx := idx
-		h.transportService.SendRequest(node, NodeStatsAction, []byte(""), func(response []byte) {
+		h.transportService.SendRequest(node, NodesStatsAction, []byte(""), func(response []byte) {
 			nodeStatsRes := nodeStatsResponseFromBytes(response)
 			responses[currIdx] = *nodeStatsRes
 			wg.Done()
@@ -171,7 +177,47 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 			"host":              response.Node.HostAddress,
 			"ip":                response.Node.HostAddress,
 			"roles":             []string{"data", "master"},
-			"os":                map[string]interface{}{},
+			"jvm": map[string]interface{}{
+				"mem": map[string]interface{}{
+					"heap_used_in_bytes": response.NodeStats.RuntimeStats.HeapAlloc,
+					"heap_max_in_bytes":  response.NodeStats.RuntimeStats.HeapSys,
+					"heap_used_percent":  response.NodeStats.RuntimeStats.HeapAlloc * 100 / response.NodeStats.RuntimeStats.HeapSys,
+				},
+			},
+			"os": map[string]interface{}{
+				"cpu": map[string]interface{}{
+					"percent": response.NodeStats.OsStats.CpuStats.Percent,
+					"load_average": map[string]interface{}{
+						"1m":  response.NodeStats.OsStats.CpuStats.LoadAverage.Load1,
+						"5m":  response.NodeStats.OsStats.CpuStats.LoadAverage.Load5,
+						"15m": response.NodeStats.OsStats.CpuStats.LoadAverage.Load15,
+					},
+				},
+				"mem": map[string]interface{}{
+					"total_in_bytes": response.NodeStats.OsStats.MemStats.Total,
+					"free_in_bytes":  response.NodeStats.OsStats.MemStats.Free,
+					"used_in_bytes":  response.NodeStats.OsStats.MemStats.Total - response.NodeStats.OsStats.MemStats.Free,
+					"free_percent":   response.NodeStats.OsStats.MemStats.Free * 100 / response.NodeStats.OsStats.MemStats.Total,
+					"used_percent":   100 - response.NodeStats.OsStats.MemStats.Free*100/response.NodeStats.OsStats.MemStats.Total,
+				},
+			},
+			"fs": map[string]interface{}{
+				"total": map[string]interface{}{
+					"total_in_bytes":     response.NodeStats.FsStats.Total,
+					"free_in_bytes":      response.NodeStats.FsStats.Free,
+					"available_in_bytes": response.NodeStats.FsStats.Available,
+				},
+			},
+			"process": map[string]interface{}{
+				"open_file_descriptors": response.NodeStats.ProcStats.NumFDs,
+				"max_file_descriptors":  -1,
+				"cpu": map[string]interface{}{
+					"percent": response.NodeStats.ProcStats.CpuPercent,
+				},
+				"mem": map[string]interface{}{
+					"total_virtual_in_bytes": response.NodeStats.ProcStats.MemTotalVirtual,
+				},
+			},
 		}
 	}
 

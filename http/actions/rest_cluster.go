@@ -233,8 +233,8 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 	docs := uint64(0)
 	numBytesUsedDisk := uint64(0)
 	for _, response := range responses {
-		memTotal += response.NodeStats.OsStats.MemTotal
-		memFree += response.NodeStats.OsStats.MemFree
+		memTotal += response.NodeStats.OsStats.MemStats.Total
+		memFree += response.NodeStats.OsStats.MemStats.Free
 
 		fsTotal += response.NodeStats.FsStats.Total
 		fsFree += response.NodeStats.FsStats.Free
