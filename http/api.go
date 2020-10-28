@@ -126,7 +126,7 @@ func New(
 		actions.GET: nodeInfosAction,
 	})
 
-	nodeStatsAction := actions.NewRestNodesStats(clusterService, transportService)
+	nodeStatsAction := actions.NewRestNodesStats(clusterService, indicesService, transportService)
 	c.pathTrie.insert("/_nodes/{nodeId}/stats", actions.MethodHandlers{
 		actions.GET: nodeStatsAction,
 	})

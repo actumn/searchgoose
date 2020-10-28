@@ -6,6 +6,7 @@ import (
 	"github.com/actumn/searchgoose/monitor"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
+	"github.com/actumn/searchgoose/state/indices"
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
 	"os"
@@ -162,8 +163,9 @@ func (h *RestNodesInfo) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type nodeStatsResponse struct {
-	Node      state.Node
-	NodeStats monitor.Stats
+	Node         state.Node
+	NodeStats    monitor.Stats
+	IndicesStats indices.Stats
 }
 
 func (r *nodeStatsResponse) toBytes() []byte {
@@ -190,14 +192,29 @@ type RestNodesStats struct {
 	transportService *transport.Service
 }
 
-func NewRestNodesStats(clusterService *cluster.Service, transportService *transport.Service) *RestNodesStats {
+func NewRestNodesStats(clusterService *cluster.Service, indicesService *indices.Service, transportService *transport.Service) *RestNodesStats {
 	monitorService := monitor.NewService()
 	transportService.RegisterRequestHandler(NodesStatsAction, func(channel transport.ReplyChannel, req []byte) {
 		stats := monitorService.Stats()
+		// TODO :: find out more elastic way to compute total indices stats
+		indicesStats := indices.Stats{
+			NumDocs:  0,
+			NumBytes: 0,
+		}
+
+		for _, indexService := range indicesService.Indices {
+			for _, shard := range indexService.Shards {
+				shardStats := shard.Stats()
+
+				indicesStats.NumDocs += shardStats.NumDocs
+				indicesStats.NumBytes += shardStats.UserData["num_bytes_used_disk"].(uint64)
+			}
+		}
 
 		nodeRes := nodeStatsResponse{
-			Node:      *transportService.LocalNode,
-			NodeStats: stats,
+			Node:         *transportService.LocalNode,
+			NodeStats:    stats,
+			IndicesStats: indicesStats,
 		}
 		channel.SendMessage("", nodeRes.toBytes())
 	})
@@ -251,6 +268,7 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 	}
 	wg.Wait()
 
+	wd, _ := os.Getwd()
 	nodeStatsMap := map[string]interface{}{}
 	for _, response := range responses {
 		nodeStatsMap[response.Node.Id] = map[string]interface{}{
@@ -258,6 +276,15 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 			"host":              response.Node.HostAddress,
 			"ip":                response.Node.HostAddress,
 			"roles":             []string{"data", "master"},
+			"indices": map[string]interface{}{
+				"docs": map[string]interface{}{
+					"count":   response.IndicesStats.NumDocs,
+					"deleted": -1,
+				},
+				"store": map[string]interface{}{
+					"size_in_bytes": response.IndicesStats.NumBytes,
+				},
+			},
 			"jvm": map[string]interface{}{
 				"mem": map[string]interface{}{
 					"heap_used_in_bytes": response.NodeStats.Runtime.HeapAlloc,
@@ -287,6 +314,14 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 					"total_in_bytes":     response.NodeStats.Fs.Total,
 					"free_in_bytes":      response.NodeStats.Fs.Free,
 					"available_in_bytes": response.NodeStats.Fs.Available,
+				},
+				"data": []map[string]interface{}{
+					{
+						"path":               wd + "/data",
+						"total_in_bytes":     response.NodeStats.Fs.Total,
+						"free_in_bytes":      response.NodeStats.Fs.Free,
+						"available_in_bytes": response.NodeStats.Fs.Available,
+					},
 				},
 			},
 			"process": map[string]interface{}{

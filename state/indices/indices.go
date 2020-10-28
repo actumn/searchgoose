@@ -45,3 +45,8 @@ func (s *Service) deleteIndexStore(idx state.Index) {
 		logrus.Fatal(err)
 	}
 }
+
+type Stats struct {
+	NumDocs  uint64
+	NumBytes uint64
+}
