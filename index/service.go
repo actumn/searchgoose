@@ -10,14 +10,14 @@ import (
 
 type Service struct {
 	uuid         string
-	shards       map[int]*Shard
+	Shards       map[int]*Shard
 	indexMapping *mapping.IndexMappingImpl
 }
 
 func NewService(uuid string) *Service {
 	return &Service{
 		uuid:         uuid,
-		shards:       map[int]*Shard{},
+		Shards:       map[int]*Shard{},
 		indexMapping: mapping.NewIndexMapping(),
 	}
 }
@@ -60,12 +60,13 @@ func (s *Service) UpdateMapping(metadata state.IndexMetadata) {
 	}
 }
 
-func (s *Service) CreateShard(shardId int) {
-	shard := NewShard("./data/"+s.uuid+"/"+strconv.Itoa(shardId), s.indexMapping)
-	s.shards[shardId] = shard
+func (s *Service) CreateShard(shardRouting state.ShardRouting) {
+	path := "./data/" + s.uuid + "/" + strconv.Itoa(shardRouting.ShardId.ShardId)
+	shard := NewShard(shardRouting, path, s.indexMapping)
+	s.Shards[shardRouting.ShardId.ShardId] = shard
 }
 
 func (s *Service) Shard(shardId int) (*Shard, bool) {
-	shard, ok := s.shards[shardId]
+	shard, ok := s.Shards[shardId]
 	return shard, ok
 }

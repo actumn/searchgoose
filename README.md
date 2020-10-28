@@ -21,8 +21,15 @@ Study purposes, mostly for understanding the implementation details of how
 [elasticearch](https://github.com/elastic/elasticsearch) is built, focusing on clustering distributed system and supporting full-text search using [bleve](https://github.com/blevesearch/bleve).
 
 ## Run
+### Single mode
 ```shell script
-$ go run main.go
+$ go run main.go -host_address=127.0.0.1 -transport.port=8180 -http.port=8080
+```
+### Clustering mode
+```shell script
+$ go run main.go -seed_hosts=127.0.0.1:8179,127.0.0.1:8181 -host_address=127.0.0.1 -transport.port=8180 -http.port=8080
+$ go run main.go -seed_hosts=127.0.0.1:8180 -host_address=127.0.0.1 -transport.port=8179 -http.port=8081
+$ go run main.go -seed_hosts=127.0.0.1:8180 -host_address=127.0.0.1 -transport.port=8181 -http.port=8082
 ```
 
 ## API
