@@ -20,6 +20,12 @@
 Study purposes, mostly for understanding the implementation details of how
 [elasticearch](https://github.com/elastic/elasticsearch) is built, focusing on clustering distributed system and supporting full-text search using [bleve](https://github.com/blevesearch/bleve).
 
+## Build 
+### Docker
+```shell script
+$ docker build . --rm --tag searchgoose:latest
+```
+
 ## Run
 ### Single mode
 ```shell script

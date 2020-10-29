@@ -3,6 +3,7 @@ package actions
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"github.com/actumn/searchgoose/index"
 	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
@@ -165,41 +166,76 @@ func (h *RestIndicesStatsAction) Handle(r *RestRequest, reply ResponseListener) 
 	for _, response := range responses {
 		totalShards += response.TotalShards
 
-		for _, shardStat := range response.ShardStats {
-			if indexStats, existing := indicesStats[shardStat.ShardRouting.ShardId.Index.Name]; existing {
-				indicesStats[shardStat.ShardRouting.ShardId.Index.Name] = index.Stats{
-					Name:       shardStat.ShardRouting.ShardId.Index.Name,
-					Uuid:       shardStat.ShardRouting.ShardId.Index.Uuid,
-					ShardStats: append(indexStats.ShardStats, shardStat),
+		for _, shardStats := range response.ShardStats {
+			if indexStats, existing := indicesStats[shardStats.ShardRouting.ShardId.Index.Name]; existing {
+				indicesStats[shardStats.ShardRouting.ShardId.Index.Name] = index.Stats{
+					Name:       shardStats.ShardRouting.ShardId.Index.Name,
+					Uuid:       shardStats.ShardRouting.ShardId.Index.Uuid,
+					ShardStats: append(indexStats.ShardStats, shardStats),
 				}
 			} else {
-				indicesStats[shardStat.ShardRouting.ShardId.Index.Name] = index.Stats{
-					Name:       shardStat.ShardRouting.ShardId.Index.Name,
-					Uuid:       shardStat.ShardRouting.ShardId.Index.Uuid,
-					ShardStats: []index.ShardStats{shardStat},
+				indicesStats[shardStats.ShardRouting.ShardId.Index.Name] = index.Stats{
+					Name:       shardStats.ShardRouting.ShardId.Index.Name,
+					Uuid:       shardStats.ShardRouting.ShardId.Index.Uuid,
+					ShardStats: []index.ShardStats{shardStats},
 				}
 			}
 		}
 	}
 
 	indicesMap := map[string]interface{}{}
+	allDocsCount := uint64(0)
+	allDocsDeleted := uint64(0)
+	allSizesInBytes := uint64(0)
 	for indexName, indexStats := range indicesStats {
 		docsCount := uint64(0)
+		docsDeleted := uint64(0)
 		sizesInBytes := uint64(0)
-		for _, shardStat := range indexStats.ShardStats {
-			docsCount += shardStat.NumDocs
-			sizesInBytes += shardStat.UserData["num_bytes_used_disk"].(uint64)
+		for _, shardStats := range indexStats.ShardStats {
+			docsCount += shardStats.NumDocs
+			docsDeleted += shardStats.UserData["deletes"].(uint64)
+			sizesInBytes += shardStats.UserData["num_bytes_used_disk"].(uint64)
 		}
+		allDocsCount += docsCount
+		allDocsDeleted += docsDeleted
+		allSizesInBytes += sizesInBytes
 
 		indicesMap[indexName] = map[string]interface{}{
 			"uuid": indexStats.Uuid,
 			"primaries": map[string]interface{}{
 				"docs": map[string]interface{}{
 					"count":   docsCount,
-					"deleted": -1,
+					"deleted": docsDeleted,
 				},
 				"store": map[string]interface{}{
 					"size_in_bytes": sizesInBytes,
+				},
+				"indexing": map[string]interface{}{
+					"index_total":           docsCount,
+					"index_time_in_millis":  -1,
+					"index_current":         0,
+					"index_failed":          0,
+					"delete_total":          docsDeleted,
+					"delete_time_in_millis": -1,
+					"delete_current":        0,
+				},
+			},
+			"total": map[string]interface{}{
+				"docs": map[string]interface{}{
+					"count":   docsCount,
+					"deleted": docsDeleted,
+				},
+				"store": map[string]interface{}{
+					"size_in_bytes": sizesInBytes,
+				},
+				"indexing": map[string]interface{}{
+					"index_total":           docsCount,
+					"index_time_in_millis":  -1,
+					"index_current":         0,
+					"index_failed":          0,
+					"delete_total":          docsDeleted,
+					"delete_time_in_millis": -1,
+					"delete_current":        0,
 				},
 			},
 		}
@@ -213,11 +249,84 @@ func (h *RestIndicesStatsAction) Handle(r *RestRequest, reply ResponseListener) 
 				"successful": totalShards,
 				"failed":     0,
 			},
-			//"_all": map[string]interface{}{
-			//	"primaries": map[string]interface{}{},
-			//	"total":     map[string]interface{}{},
-			//},
+			"_all": map[string]interface{}{
+				"primaries": map[string]interface{}{
+					"docs": map[string]interface{}{
+						"count":   allDocsCount,
+						"deleted": allDocsDeleted,
+					},
+					"store": map[string]interface{}{
+						"size_in_bytes": allSizesInBytes,
+					},
+					"indexing": map[string]interface{}{
+						"index_total":           allDocsCount,
+						"index_time_in_millis":  -1,
+						"index_current":         0,
+						"index_failed":          0,
+						"delete_total":          allDocsDeleted,
+						"delete_time_in_millis": -1,
+						"delete_current":        0,
+					},
+				},
+				"total": map[string]interface{}{
+					"docs": map[string]interface{}{
+						"count":   allDocsCount,
+						"deleted": allDocsDeleted,
+					},
+					"store": map[string]interface{}{
+						"size_in_bytes": allSizesInBytes,
+					},
+					"indexing": map[string]interface{}{
+						"index_total":           allDocsCount,
+						"index_time_in_millis":  -1,
+						"index_current":         0,
+						"index_failed":          0,
+						"delete_total":          allDocsDeleted,
+						"delete_time_in_millis": -1,
+						"delete_current":        0,
+					},
+				},
+			},
 			"indices": indicesMap,
 		},
+	})
+}
+
+type RestGetMappings struct {
+	clusterService              *cluster.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
+}
+
+func NewRestGetMappings(clusterService *cluster.Service, indexNameExpressionResolver *indices.NameExpressionResolver) *RestGetMappings {
+	return &RestGetMappings{
+		clusterService:              clusterService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
+	}
+}
+
+func (h *RestGetMappings) Handle(r *RestRequest, reply ResponseListener) {
+	indexExpression := r.PathParams["index"]
+	if indexExpression == "" {
+		indexExpression = "*"
+	}
+
+	clusterState := h.clusterService.State()
+	concreteIndices := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, indexExpression)
+
+	indicesInfo := map[string]interface{}{}
+	for _, indexName := range concreteIndices {
+		indexMetadata := clusterState.Metadata.Indices[indexName]
+
+		var mappings map[string]interface{}
+		if err := json.Unmarshal(indexMetadata.Mapping["_doc"].Source, &mappings); err != nil {
+			logrus.Fatal(err)
+		}
+		indicesInfo[indexName] = map[string]interface{}{
+			"mappings": mappings,
+		}
+	}
+	reply(RestResponse{
+		StatusCode: 200,
+		Body:       indicesInfo,
 	})
 }

@@ -66,44 +66,53 @@ func (h *RestClusterHealth) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type RestClusterState struct {
-	clusterService *cluster.Service
+	clusterService              *cluster.Service
+	indexNameExpressionResolver *indices.NameExpressionResolver
 }
 
-func NewRestClusterStateMetadata(clusterService *cluster.Service) *RestClusterState {
+func NewRestClusterState(clusterService *cluster.Service, indexNameExpressionResolver *indices.NameExpressionResolver) *RestClusterState {
 	return &RestClusterState{
-		clusterService: clusterService,
+		clusterService:              clusterService,
+		indexNameExpressionResolver: indexNameExpressionResolver,
 	}
 }
 
 func (h *RestClusterState) Handle(r *RestRequest, reply ResponseListener) {
+	indexExpression := r.PathParams["indices"]
+	if indexExpression == "" {
+		indexExpression = "*"
+	}
+
 	clusterState := h.clusterService.State()
-	metadata := clusterState.Metadata
+	concreteIndices := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, indexExpression)
 
 	indicesInfo := map[string]interface{}{}
-	for _, index := range metadata.Indices {
+	for _, indexName := range concreteIndices {
+		indexMetadata := clusterState.Metadata.Indices[indexName]
+
 		var mappings map[string]interface{}
-		if err := json.Unmarshal(index.Mapping["_doc"].Source, &mappings); err != nil {
+		if err := json.Unmarshal(indexMetadata.Mapping["_doc"].Source, &mappings); err != nil {
 			logrus.Fatal(err)
 		}
 
 		aliases := map[string]interface{}{}
-		for _, alias := range index.Aliases {
+		for _, alias := range indexMetadata.Aliases {
 			aliases[alias.Alias] = map[string]interface{}{}
 		}
-		indicesInfo[index.Index.Name] = map[string]interface{}{
+		indicesInfo[indexMetadata.Index.Name] = map[string]interface{}{
 			"state":    "open",
 			"aliases":  aliases,
 			"mappings": mappings,
 			"settings": map[string]interface{}{
 				"index": map[string]interface{}{
 					"creation_date":      "1597382566866",
-					"number_of_shards":   strconv.Itoa(index.NumberOfShards),
+					"number_of_shards":   strconv.Itoa(indexMetadata.NumberOfShards),
 					"number_of_replicas": "0",
-					"uuid":               index.Index.Uuid,
+					"uuid":               indexMetadata.Index.Uuid,
 					"version": map[string]interface{}{
 						"created": "7080299",
 					},
-					"provided_name": index.Index.Name,
+					"provided_name": indexMetadata.Index.Name,
 				},
 			},
 		}
@@ -231,6 +240,7 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 	shards := 0
 	primaries := 0
 	docs := uint64(0)
+	docsDeleted := uint64(0)
 	numBytesUsedDisk := uint64(0)
 	for _, response := range responses {
 		memTotal += response.NodeStats.Os.Mem.Total
@@ -240,15 +250,16 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 		fsFree += response.NodeStats.Fs.Free
 		fsAvailable += response.NodeStats.Fs.Available
 
-		for _, shardStat := range response.ShardStats {
-			docs += shardStat.NumDocs
+		for _, shardStats := range response.ShardStats {
+			docs += shardStats.NumDocs
+			docsDeleted += shardStats.UserData["deletes"].(uint64)
 
-			indicesCount[shardStat.ShardRouting.ShardId.Index.Name] = struct{}{}
+			indicesCount[shardStats.ShardRouting.ShardId.Index.Name] = struct{}{}
 			shards += 1
-			if shardStat.ShardRouting.Primary {
+			if shardStats.ShardRouting.Primary {
 				primaries += 1
 			}
-			numBytesUsedDisk += shardStat.UserData["num_bytes_used_disk"].(uint64)
+			numBytesUsedDisk += shardStats.UserData["num_bytes_used_disk"].(uint64)
 		}
 	}
 
@@ -271,7 +282,7 @@ func (h *RestClusterStats) Handle(r *RestRequest, reply ResponseListener) {
 				},
 				"docs": map[string]interface{}{
 					"count":   docs,
-					"deleted": -1,
+					"deleted": docsDeleted,
 				},
 				"store": map[string]interface{}{
 					"size_in_bytes": numBytesUsedDisk,
