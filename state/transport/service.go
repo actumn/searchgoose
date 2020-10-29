@@ -42,7 +42,7 @@ type ReplyChannel interface {
 
 type Transport interface {
 	OpenConnection(address string, callback func(conn Connection))
-	Start(address string)
+	Start(port int)
 	Register(action string, handler RequestHandler)
 	GetLocalAddress() string
 	GetSeedHosts() []string
@@ -79,9 +79,8 @@ func NewService(transport Transport, nodeName string) *Service {
 	return service
 }
 
-func (s *Service) Start() {
-	address := s.Transport.GetLocalAddress()
-	s.Transport.Start(address)
+func (s *Service) Start(port int) {
+	s.Transport.Start(port)
 }
 
 func (s *Service) SendRequestConn(conn Connection, action string, req []byte, callback func(response []byte)) {
@@ -210,7 +209,7 @@ func (h *HandshakeRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(h); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -220,7 +219,7 @@ func HandshakeRequestFromBytes(b []byte) *HandshakeRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data HandshakeRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }
@@ -234,7 +233,7 @@ func (h *HandshakeResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(h); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -244,7 +243,7 @@ func HandshakeResponseFromBytes(b []byte) *HandshakeResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data HandshakeResponse
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }

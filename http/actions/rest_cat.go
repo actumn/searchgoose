@@ -70,7 +70,7 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 			//"hc":         "156.8mb", // heap current
 			//"hm":         "512mb",   // heap max
 			"hp": strconv.FormatUint(heapPer, 10), // heap percent
-			"ip": node.HostAddress[0 : len(node.HostAddress)-5],
+			"ip": node.HostAddress,
 			//"dt":         "468.4gb", // disk total
 			//"du":         "267.4gb", // disk used
 			"disk.avail": common.IBytes(nodeStats.Fs.Available), // disk available

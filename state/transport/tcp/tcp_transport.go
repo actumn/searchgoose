@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -95,7 +96,23 @@ func (c *ReplyChannel) GetDestAddress() string {
 	return c.destAddress
 }
 
-func NewTransport(hostAddress string, seedHost string, nodeId string) *Transport {
+func NewTransport(port int, seedHost string, nodeId string) *Transport {
+	var hostAddress string
+	address, err := net.InterfaceAddrs()
+	if err != nil {
+		logrus.Fatal("Fail to get interfaces")
+	}
+
+	for _, a := range address {
+		if ipNet, ok := a.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			if ipNet.IP.To4() != nil {
+				hostAddress = ipNet.IP.String() + ":"
+				hostAddress += strconv.Itoa(port)
+				break
+			}
+		}
+	}
+
 	var seedHosts []string
 	if len(seedHost) > 0 {
 		seedHosts = strings.Split(seedHost, ",")
@@ -113,13 +130,14 @@ func (t *Transport) Register(action string, handler transport.RequestHandler) {
 	t.RequestHandlers[action] = handler
 }
 
-func (t *Transport) Start(address string) {
+func (t *Transport) Start(port int) {
+	listen := "0.0.0.0:" + strconv.Itoa(port)
 	go func() {
-		l, err := net.Listen("tcp", address)
+		l, err := net.Listen("tcp", listen)
 		if err != nil {
-			logrus.Fatalf("Fail to bind address to %s; err: %v", address, err)
+			logrus.Fatalf("Fail to bind address to %s; err: %v", err)
 		}
-		logrus.Infof("Success of listening on %s", address)
+		logrus.Infof("Success of listening on %s", listen)
 		defer l.Close()
 
 		for {
@@ -147,7 +165,7 @@ func (t *Transport) Start(address string) {
 						data := recvData.Content
 
 						if strings.Contains(action, "_FAIL") {
-							logrus.Warnln("Error: %s", string(data))
+							logrus.Fatalln("Error: %s", string(data))
 						} else {
 							t.RequestHandlers[action](&ReplyChannel{
 								conn:         conn,
@@ -210,7 +228,7 @@ func (d *DataFormat) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(d); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -220,7 +238,7 @@ func DataFormatFromBytes(b []byte) *DataFormat {
 	decoder := gob.NewDecoder(buffer)
 	var data DataFormat
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }

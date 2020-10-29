@@ -44,9 +44,9 @@ func init() {
 	}
 
 	seedHosts := flag.String("seed_hosts", "", "연결할 노드들")
-	host := flag.String("host_address", "", "호스트 주소")
-	tcpPort := flag.Int("transport.port", 0, "Transport 연결 노드")
-	httpPort := flag.Int("http.port", 0, "HTTP 연결 노드")
+	host := flag.String("host_address", "0.0.0.0", "호스트 주소")
+	tcpPort := flag.Int("transport.port", 8180, "Transport 연결 노드")
+	httpPort := flag.Int("http.port", 8080, "HTTP 연결 노드")
 	nodeName := flag.String("node.name", "", "노드 이름")
 
 	flag.Parse()
@@ -74,14 +74,14 @@ func start() {
 
 	var tcpTransport transport.Transport
 
-	host := viper.GetString("network.host") + ":" + viper.GetString("transport.port")
+	tcpPort := viper.GetInt("transport.port")
 	seedHost := viper.GetString("discovery.seed_hosts")
 	id := viper.GetString("node.id")
 	name := viper.GetString("node.name")
 
-	tcpTransport = tcp.NewTransport(host, seedHost, id)
+	tcpTransport = tcp.NewTransport(tcpPort, seedHost, id)
 	transportService := transport.NewService(tcpTransport, name)
-	transportService.Start()
+	transportService.Start(tcpPort)
 
 	clusterService := cluster.NewService()
 	persistClusterStateService := persist.NewClusterStateService()
