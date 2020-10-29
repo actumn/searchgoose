@@ -110,14 +110,31 @@ func New(
 	c.pathTrie.insert("/_alias/{name}", actions.MethodHandlers{
 		actions.GET: actions.NewRestGetIndexAlias(clusterService, indexNameExpressionResolver),
 	})
-	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
-		actions.GET: actions.NewRestNodes(clusterService),
-	})
 	c.pathTrie.insert("/_xpack", actions.MethodHandlers{
 		actions.GET: &actions.RestXpack{},
 	})
-	c.pathTrie.insert("/_stats", actions.MethodHandlers{
-		actions.GET: actions.NewRestIndicesStatsAction(indicesService),
+
+	///////////////////////////// nodes ///////////////////////////////////
+	nodeInfosAction := actions.NewRestNodesInfo(clusterService, transportService)
+	c.pathTrie.insert("/_nodes", actions.MethodHandlers{
+		actions.GET: nodeInfosAction,
+	})
+	c.pathTrie.insert("/_nodes/{nodeId}", actions.MethodHandlers{
+		actions.GET: nodeInfosAction,
+	})
+	c.pathTrie.insert("/_nodes/{nodeId}/_all", actions.MethodHandlers{
+		actions.GET: nodeInfosAction,
+	})
+
+	nodeStatsAction := actions.NewRestNodesStats(clusterService, indicesService, transportService)
+	c.pathTrie.insert("/_nodes/{nodeId}/stats", actions.MethodHandlers{
+		actions.GET: nodeStatsAction,
+	})
+	c.pathTrie.insert("/_nodes/stats", actions.MethodHandlers{
+		actions.GET: nodeStatsAction,
+	})
+	c.pathTrie.insert("/_nodes/stats/{metric}", actions.MethodHandlers{
+		actions.GET: nodeStatsAction,
 	})
 
 	///////////////////////////// cat /////////////////////////////////////
@@ -128,18 +145,22 @@ func New(
 		actions.GET: &actions.RestCatTemplates{},
 	})
 	c.pathTrie.insert("/_cat/nodes", actions.MethodHandlers{
-		actions.GET: actions.NewRestCatNodes(),
+		actions.GET: actions.NewRestCatNodes(clusterService, transportService),
 	})
 	c.pathTrie.insert("/_cat/indices", actions.MethodHandlers{
-		actions.GET: actions.NewRestCatIndices(indexNameExpressionResolver),
+		actions.GET: actions.NewRestCatIndices(clusterService, indexNameExpressionResolver, transportService),
 	})
 
 	//////////////////////////// cluster //////////////////////////////////
 	c.pathTrie.insert("/_cluster/health", actions.MethodHandlers{
 		actions.GET: actions.NewRestClusterHealth(clusterService, indexNameExpressionResolver),
 	})
-	c.pathTrie.insert("/_cluster/state/metadata", actions.MethodHandlers{
-		actions.GET: actions.NewRestClusterStateMetadata(clusterService),
+	clusterStateAction := actions.NewRestClusterState(clusterService, indexNameExpressionResolver)
+	c.pathTrie.insert("/_cluster/state/{metric}", actions.MethodHandlers{
+		actions.GET: clusterStateAction,
+	})
+	c.pathTrie.insert("/_cluster/state/{metric}/{indices}", actions.MethodHandlers{
+		actions.GET: clusterStateAction,
 	})
 	c.pathTrie.insert("/_cluster/stats", actions.MethodHandlers{
 		actions.GET: actions.NewRestClusterStats(clusterService, transportService, indicesService),
@@ -173,12 +194,27 @@ func New(
 		actions.GET:  actions.NewRestRefresh(clusterService),
 		actions.POST: actions.NewRestRefresh(clusterService),
 	})
+
+	indicesStatsAction := actions.NewRestIndicesStatsAction(clusterService, indicesService, indexNameExpressionResolver, transportService)
+	c.pathTrie.insert("/_stats", actions.MethodHandlers{
+		actions.GET: indicesStatsAction,
+	})
+	c.pathTrie.insert("/{index}/_stats", actions.MethodHandlers{
+		actions.GET: indicesStatsAction,
+	})
 	//c.pathTrie.insert("/{index}/_bulk", actions.MethodHandlers{
 	//	actions.POST: ,
 	//	actions.PUT: ,
 	//})
 	c.pathTrie.insert("/{index}/{type}/{id}/_source", actions.MethodHandlers{
 		actions.GET: actions.NewRestGetSource(clusterService, indicesService, indexNameExpressionResolver, transportService),
+	})
+	getMappingsAction := actions.NewRestGetMappings(clusterService, indexNameExpressionResolver)
+	c.pathTrie.insert("/_mapping", actions.MethodHandlers{
+		actions.GET: getMappingsAction,
+	})
+	c.pathTrie.insert("/{index}/_mapping", actions.MethodHandlers{
+		actions.GET: getMappingsAction,
 	})
 
 	s := &fasthttp.Server{

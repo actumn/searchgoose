@@ -1,6 +1,14 @@
 package actions
 
-import "github.com/actumn/searchgoose/state/indices"
+import (
+	"github.com/actumn/searchgoose/common"
+	"github.com/actumn/searchgoose/monitor"
+	"github.com/actumn/searchgoose/state/cluster"
+	"github.com/actumn/searchgoose/state/indices"
+	"github.com/actumn/searchgoose/state/transport"
+	"strconv"
+	"sync"
+)
 
 type RestCatTemplates struct{}
 
@@ -12,90 +20,102 @@ func (h *RestCatTemplates) Handle(r *RestRequest, reply ResponseListener) {
 }
 
 type RestCatNodes struct {
+	clusterService   *cluster.Service
+	transportService *transport.Service
 }
 
-func NewRestCatNodes() *RestCatNodes {
-	return &RestCatNodes{}
+func NewRestCatNodes(clusterService *cluster.Service, transportService *transport.Service) *RestCatNodes {
+	return &RestCatNodes{
+		clusterService:   clusterService,
+		transportService: transportService,
+	}
 }
 
 func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
-	// TODO :: resolve nodes list from cluster state and broadcasting
+	clusterState := h.clusterService.State()
+
+	nodes := clusterState.Nodes.Nodes
+	responses := make([]nodeStatsResponse, len(nodes))
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodes))
+	idx := -1
+	for _, node := range nodes {
+		idx += 1
+		currIdx := idx
+		h.transportService.SendRequest(node, NodesStatsAction, []byte(""), func(response []byte) {
+			nodeStatsRes := nodeStatsResponseFromBytes(response)
+			responses[currIdx] = *nodeStatsRes
+			wg.Done()
+		})
+	}
+	wg.Wait()
+
+	nodeStatsMap := map[string]monitor.Stats{}
+	for _, response := range responses {
+		nodeStatsMap[response.Node.Id] = response.NodeStats
+	}
+
+	var nodesList []map[string]interface{}
+	for n, node := range clusterState.Nodes.Nodes {
+		nodeStats := nodeStatsMap[node.Id]
+		heapPer := nodeStats.Runtime.HeapAlloc * 100 / nodeStats.Runtime.HeapSys
+		nodesList = append(nodesList, map[string]interface{}{
+			"id":   node.Id,
+			"m":    "*", // master
+			"n":    n + node.Name,
+			"u":    "44m",    // uptime
+			"role": "dilmrt", // node role
+			//"hc":         "156.8mb", // heap current
+			//"hm":         "512mb",   // heap max
+			"hp": strconv.FormatUint(heapPer, 10), // heap percent
+			"ip": node.HostAddress[0 : len(node.HostAddress)-5],
+			//"dt":         "468.4gb", // disk total
+			//"du":         "267.4gb", // disk used
+			"disk.avail": common.IBytes(nodeStats.Fs.Available), // disk available
+			"l":          "-1",                                  //
+		})
+	}
 	reply(RestResponse{
 		StatusCode: 200,
-		Body: []interface{}{
-			map[string]interface{}{
-				"id":         "92_F",
-				"m":          "*",
-				"n":          "es-main",
-				"u":          "44m",
-				"role":       "dilmrt",
-				"hc":         "156.8mb",
-				"hm":         "512mb",
-				"hp":         "30",
-				"ip":         "172.28.0.1",
-				"dt":         "468.4gb",
-				"du":         "267.4gb",
-				"disk.avail": "200.9gb",
-				"l":          "2.62",
-			},
-			map[string]interface{}{
-				"id":         "92_G",
-				"m":          "*",
-				"n":          "es-main2",
-				"u":          "44m",
-				"role":       "dilmrt",
-				"hc":         "156.8mb",
-				"hm":         "512mb",
-				"hp":         "30",
-				"ip":         "172.28.0.2",
-				"dt":         "468.4gb",
-				"du":         "267.4gb",
-				"disk.avail": "200.9gb",
-				"l":          "2.62",
-			},
-		},
+		Body:       nodesList,
 	})
 }
 
 type RestCatIndices struct {
+	clusterService              *cluster.Service
 	indexNameExpressionResolver *indices.NameExpressionResolver
+	transportService            *transport.Service
 }
 
-func NewRestCatIndices(indexNameExpressionResolver *indices.NameExpressionResolver) *RestCatIndices {
+func NewRestCatIndices(clusterService *cluster.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestCatIndices {
 	return &RestCatIndices{
+		clusterService:              clusterService,
 		indexNameExpressionResolver: indexNameExpressionResolver,
+		transportService:            transportService,
 	}
 }
 
 func (h *RestCatIndices) Handle(r *RestRequest, reply ResponseListener) {
-	// TODO :: resolve indices list from cluster state and broadcasting
+	clusterState := h.clusterService.State()
+	var indicesList []map[string]interface{}
+	for _, indexMetadata := range clusterState.Metadata.Indices {
+		// TODO :: resolve indices information from broadcasting
+		indicesList = append(indicesList, map[string]interface{}{
+			"health": "green",
+			"status": "open",
+			"index":  indexMetadata.Index.Name,
+			"uuid":   indexMetadata.Index.Uuid,
+			//"pri":            "1",
+			//"rep":            "0",
+			//"docs.count":     "100",
+			//"docs.deleted":   "0",
+			//"store.size":     "208b",
+			//"pri.store.size": "208b",
+		})
+	}
+
 	reply(RestResponse{
 		StatusCode: 200,
-		Body: []interface{}{
-			map[string]interface{}{
-				"health":         "green",
-				"status":         "open",
-				"index":          ".kibana_task_manager_2",
-				"uuid":           "3qXOKMs-QYS0RL2ErQFubQ",
-				"pri":            "1",
-				"rep":            "0",
-				"docs.count":     "0",
-				"docs.deleted":   "0",
-				"store.size":     "208b",
-				"pri.store.size": "208b",
-			},
-			map[string]interface{}{
-				"health":         "yellow",
-				"status":         "open",
-				"index":          ".elastichq",
-				"uuid":           "HaeD3pq9TvyaSDPmFINvUQ",
-				"pri":            "1",
-				"rep":            "1",
-				"docs.count":     "1",
-				"docs.deleted":   "0",
-				"store.size":     "6.4kb",
-				"pri.store.size": "6.4kb",
-			},
-		},
+		Body:       indicesList,
 	})
 }

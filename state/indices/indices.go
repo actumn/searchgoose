@@ -8,34 +8,34 @@ import (
 )
 
 type Service struct {
-	indices map[string]*index.Service
+	Indices map[string]*index.Service
 }
 
 func NewService() *Service {
 	return &Service{
-		indices: map[string]*index.Service{},
+		Indices: map[string]*index.Service{},
 	}
 }
 
 func (s *Service) CreateIndexService(uuid string) *index.Service {
 	indexService := index.NewService(uuid)
-	s.indices[uuid] = indexService
+	s.Indices[uuid] = indexService
 	return indexService
 }
 
 func (s *Service) IndexService(uuid string) (*index.Service, bool) {
-	v, ok := s.indices[uuid]
+	v, ok := s.Indices[uuid]
 	return v, ok
 }
 
 func (s *Service) RemoveIndex(idx state.Index) {
 	//indexName := idx.Name
-	_, existing := s.indices[idx.Uuid]
+	_, existing := s.Indices[idx.Uuid]
 	if !existing {
 		return
 	}
 
-	delete(s.indices, idx.Uuid)
+	delete(s.Indices, idx.Uuid)
 	s.deleteIndexStore(idx)
 }
 
@@ -44,4 +44,10 @@ func (s *Service) deleteIndexStore(idx state.Index) {
 	if err := env.RemoveContents("./data/" + idx.Uuid); err != nil {
 		logrus.Fatal(err)
 	}
+}
+
+type Stats struct {
+	NumDocs    uint64
+	NumDeleted uint64
+	NumBytes   uint64
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/actumn/searchgoose/http"
 	"github.com/actumn/searchgoose/state/cluster"
@@ -11,6 +12,7 @@ import (
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/actumn/searchgoose/state/transport/tcp"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"runtime"
 	"strings"
 )
@@ -21,7 +23,7 @@ func main() {
 
 func init() {
 	logrus.SetLevel(logrus.TraceLevel)
-	//logrus.SetReportCaller(true)
+	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
 		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
@@ -30,25 +32,55 @@ func init() {
 			return fmt.Sprintf("%-20s", functionName+"()"), fmt.Sprintf("%s:%d\t", fileName, frame.Line)
 		},
 	})
+
+	viper.SetConfigName("searchgoose") // config file name without extension
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		logrus.Fatal("fatal error config file: searchgoose", err)
+	}
+
+	seedHosts := flag.String("seed_hosts", "", "연결할 노드들")
+	host := flag.String("host_address", "", "호스트 주소")
+	tcpPort := flag.Int("transport.port", 0, "Transport 연결 노드")
+	httpPort := flag.Int("http.port", 0, "HTTP 연결 노드")
+	nodeName := flag.String("node.name", "", "노드 이름")
+
+	flag.Parse()
+
+	viper.Set("discovery.seed_hosts", *seedHosts)
+	viper.Set("network.host", *host)
+	viper.Set("transport.port", *tcpPort)
+	viper.Set("http.port", *httpPort)
+	viper.Set("node.name", *nodeName)
+
+	nodeId := cluster.GenerateNodeId()
+	logrus.Info("[Node Id]: ", nodeId)
+	viper.Set("node.id", nodeId)
+
 }
 
 func start() {
-	nodeId := cluster.GenerateNodeId()
-	logrus.Info("[Node Id]: ", nodeId)
 
-	// TODO :: 현재 노드의 host와 port 설정을 가져오게 하자
-
-	//address := "localhost:8180"
-	//seedHosts := []string{"localhost:8179", "localhost:8181"} //8180
-	//address := "localhost:8179"
-	//seedHosts := []string{"localhost:8180"} //8179
-	address := "localhost:8181"
-	seedHosts := []string{} //8181
+	// for signal handling
+	var outer chan int
+	outer = make(chan int, 1)
+	done := func() {
+		outer <- 1
+	}
 
 	var tcpTransport transport.Transport
 
-	tcpTransport = tcp.NewTransport(address, nodeId, seedHosts)
-	transportService := transport.NewService(nodeId, tcpTransport)
+	host := viper.GetString("network.host") + ":" + viper.GetString("transport.port")
+	seedHost := viper.GetString("discovery.seed_hosts")
+	id := viper.GetString("node.id")
+	name := viper.GetString("node.name")
+
+	tcpTransport = tcp.NewTransport(host, seedHost, id)
+	transportService := transport.NewService(tcpTransport, name)
 	transportService.Start()
 
 	clusterService := cluster.NewService()
@@ -58,6 +90,7 @@ func start() {
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator := discovery.NewCoordinator(transportService, clusterService.ApplierService, clusterService.MasterService, gateway.PersistedState)
+	coordinator.Done = done
 
 	indicesService := indices.NewService()
 	indicesClusterStateService := indices.NewClusterStateService(indicesService)
@@ -73,17 +106,20 @@ func start() {
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator.Start()
-	//time.Sleep(time.Duration(15) * time.Second)
-
 	coordinator.StartInitialJoin()
-	//time.Sleep(time.Duration(1000) * time.Second)
+
+	wait := <-outer
+
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, clusterMetadataIndexAliasService, indicesService, transportService, indexNameExpressionResolver)
-	logrus.Info("start server...")
-	//if err := b.Start(":8080"); err != nil { panic(err) }
-	//if err := b.Start(":8081"); err != nil { panic(err) }
-	if err := b.Start(":8082"); err != nil {
-		panic(err)
+	httpPort := ":" + viper.GetString("http.port")
+
+	if wait == 1 {
+		logrus.Info("start server...")
+		coordinator.Started = true
+		if err := b.Start(httpPort); err != nil {
+			panic(err)
+		}
 	}
 }
