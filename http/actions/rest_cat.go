@@ -2,9 +2,7 @@ package actions
 
 import (
 	"github.com/actumn/searchgoose/common"
-	"github.com/actumn/searchgoose/index"
 	"github.com/actumn/searchgoose/monitor"
-	"github.com/actumn/searchgoose/state"
 	"github.com/actumn/searchgoose/state/cluster"
 	"github.com/actumn/searchgoose/state/indices"
 	"github.com/actumn/searchgoose/state/transport"
@@ -119,98 +117,5 @@ func (h *RestCatIndices) Handle(r *RestRequest, reply ResponseListener) {
 	reply(RestResponse{
 		StatusCode: 200,
 		Body:       indicesList,
-	})
-}
-
-type RestCatShards struct {
-	clusterService              *cluster.Service
-	indexNameExpressionResolver *indices.NameExpressionResolver
-	transportService            *transport.Service
-}
-
-func NewRestCatShards(clusterService *cluster.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestCatShards {
-	return &RestCatShards{
-		clusterService:              clusterService,
-		indexNameExpressionResolver: indexNameExpressionResolver,
-		transportService:            transportService,
-	}
-}
-
-func (h *RestCatShards) Handle(r *RestRequest, reply ResponseListener) {
-	indexExpression := r.PathParams["index"]
-	if indexExpression == "" {
-		indexExpression = "*"
-	}
-
-	clusterState := h.clusterService.State()
-	concreteIndices := h.indexNameExpressionResolver.ConcreteIndexNames(*clusterState, indexExpression)
-	if len(concreteIndices) == 0 {
-		reply(RestResponse{
-			StatusCode: 404,
-			Body:       []interface{}{},
-		})
-		return
-	}
-
-	nodeIds := map[string][]state.ShardRouting{}
-	for _, indexName := range concreteIndices {
-		indexRoutingTable := clusterState.RoutingTable.IndicesRouting[indexName]
-		for _, indexShardRoutingTable := range indexRoutingTable.Shards {
-			shard := indexShardRoutingTable.Primary
-
-			nodeId := shard.CurrentNodeId
-			if shardList, existing := nodeIds[nodeId]; existing {
-				nodeIds[nodeId] = append(shardList, shard)
-			} else {
-				nodeIds[nodeId] = []state.ShardRouting{shard}
-			}
-		}
-	}
-
-	responses := make([]indicesStatsResponse, len(nodeIds))
-	wg := sync.WaitGroup{}
-	wg.Add(len(nodeIds))
-	idx := -1
-	for nodeId, shards := range nodeIds {
-		idx += 1
-		node := clusterState.Nodes.Nodes[nodeId]
-		indicesStatsReq := indicesStatsRequest{
-			NodeId: nodeId,
-			Shards: shards,
-		}
-		currIdx := idx
-		h.transportService.SendRequest(node, IndicesStatsAction, indicesStatsReq.toBytes(), func(response []byte) {
-			indicesStatsRes := indicesStatsResponseFromBytes(response)
-			responses[currIdx] = *indicesStatsRes
-			wg.Done()
-		})
-	}
-	wg.Wait()
-
-	shardsStats := map[state.ShardRouting]index.ShardStats{}
-	for _, response := range responses {
-		for _, shardStats := range response.ShardStats {
-			shardsStats[shardStats.ShardRouting] = shardStats
-		}
-	}
-
-	var shardsInfo []map[string]interface{}
-	for _, indexRouting := range clusterState.RoutingTable.IndicesRouting {
-		for _, shardRouting := range indexRouting.Shards {
-			shardsInfo = append(shardsInfo, map[string]interface{}{
-				"index":  shardRouting.ShardId.Index.Name,
-				"shard":  shardRouting.ShardId.ShardId,
-				"prirep": "p",
-				"state":  "STARTED",
-				"docs":   shardsStats[shardRouting.Primary].NumDocs,
-				"store":  common.IBytes(shardsStats[shardRouting.Primary].UserData["num_bytes_used_disk"].(uint64)),
-				"node":   shardRouting.Primary.CurrentNodeId,
-			})
-		}
-	}
-
-	reply(RestResponse{
-		StatusCode: 200,
-		Body:       shardsInfo,
 	})
 }
