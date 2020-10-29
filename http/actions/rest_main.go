@@ -14,11 +14,13 @@ func NewRestMain(clusterService *cluster.Service) *RestMain {
 
 func (h *RestMain) Handle(r *RestRequest, reply ResponseListener) {
 	clusterState := h.clusterService.State()
+	localNodeId := clusterState.Nodes.LocalNodeId
+	localNode := clusterState.Nodes.Nodes[localNodeId]
 
 	reply(RestResponse{
 		StatusCode: 200,
 		Body: map[string]interface{}{
-			"name":         "sg-main",
+			"name":         localNode.Name,
 			"cluster_name": clusterState.Name,
 			"cluster_uuid": clusterState.StateUUID,
 			"version": map[string]interface{}{
