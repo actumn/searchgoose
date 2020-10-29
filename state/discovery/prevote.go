@@ -172,7 +172,7 @@ func (p *PreVoteRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(p); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -182,7 +182,7 @@ func PreVoteRequestFromBytes(b []byte) *PreVoteRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data PreVoteRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }
@@ -204,7 +204,7 @@ func (p *PreVoteResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(p); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -214,7 +214,7 @@ func PreVoteResponseFromBytes(b []byte) *PreVoteResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data PreVoteResponse
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }

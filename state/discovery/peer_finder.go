@@ -73,7 +73,14 @@ func (f *CoordinatorPeerFinder) handleWakeUp() {
 	//	<- inner
 	//}
 	//
-	//end()
+
+	if len(providedAddr) == 0 {
+		f.Coordinator.becomeLeader("handleWakeUp")
+	}
+
+	//if f.Coordinator.Started == false {
+	//	f.Coordinator.Done()
+	//}
 }
 
 func (f *CoordinatorPeerFinder) startProbe(address string) {
@@ -217,7 +224,7 @@ func (r *PeersRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -227,7 +234,7 @@ func PeersRequestFromBytes(b []byte) *PeersRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data PeersRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }
@@ -242,7 +249,7 @@ func (r *PeersResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -252,7 +259,7 @@ func PeersResponseFromBytes(b []byte) *PeersResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data PeersResponse
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }

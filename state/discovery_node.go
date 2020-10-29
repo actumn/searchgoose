@@ -33,7 +33,7 @@ func (n *Node) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(n); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -43,7 +43,7 @@ func NodeFromBytes(b []byte) *Node {
 	decoder := gob.NewDecoder(buffer)
 	var node Node
 	if err := decoder.Decode(&node); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &node
 }

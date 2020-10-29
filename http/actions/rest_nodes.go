@@ -113,8 +113,8 @@ func (h *RestNodesInfo) Handle(r *RestRequest, reply ResponseListener) {
 	for _, response := range responses {
 		nodesMap[response.Node.Id] = map[string]interface{}{
 			"transport_address": response.Node.HostAddress,
-			"host":              response.Node.HostAddress[0 : len(response.Node.HostAddress)-5],
-			"ip":                response.Node.HostAddress[0 : len(response.Node.HostAddress)-5],
+			"host":              response.Node.HostAddress,
+			"ip":                response.Node.HostAddress,
 			"version":           "7.8.1",
 			"roles":             []string{"master", "data"},
 			"settings": map[string]interface{}{

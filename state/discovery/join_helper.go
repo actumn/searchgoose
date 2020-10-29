@@ -103,7 +103,7 @@ func (r *StartJoinRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -113,7 +113,7 @@ func StartJoinRequestFromBytes(b []byte) *StartJoinRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data StartJoinRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }
@@ -128,7 +128,7 @@ func (r *JoinRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return buffer.Bytes()
 }
@@ -142,7 +142,7 @@ func JoinRequestFromBytes(b []byte) *JoinRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data JoinRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Warnln(err)
+		logrus.Fatalln(err)
 	}
 	return &data
 }

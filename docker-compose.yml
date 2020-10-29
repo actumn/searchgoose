@@ -1,0 +1,53 @@
+version: "3.1"
+
+services:
+  sg-master-01:
+    container_name: sg01
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["./app", "-node.name=sg-node-01", "-seed_hosts=sg-master-02:8080,sg-master-03:8080", "-transport.port=8180" ,"-http.port=8080"]
+    environment:
+      - node.name=sg-node-01
+      - seed_hosts=172.21.2.3:8080,172.21.2.4:8080
+    ports:
+      - 8180:8180
+      - 8080:8080
+    links:
+      - sg-master-02
+      - sg-master-03
+    networks:
+      - searchgoose
+  sg-master-02:
+    container_name: sg02
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["./app", "-node.name=sg-node-02", "-seed_hosts=sg-master-01:8080" ,"-transport.port=8179", "-http.port=8081"]
+    environment:
+      - node.name=sg-node-02
+      - seed_hosts=172.21.2.2:8080
+      - host_address=0.0.0.0
+    ports:
+      - 8179:8180
+      - 8081:8080
+    networks:
+      - searchgoose
+  sg-master-03:
+    container_name: sg03
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["./app" ,"-node.name=sg-node-03" ,"-seed_hosts=sg-master-01:8080", "-transport.port=8181", "-http.port=8082"]
+    environment:
+      - node.name=sg-node-03
+      - seed_hosts=172.21.2.2:8080
+      - host_address=0.0.0.0
+    ports:
+      - 8181:8180
+      - 8082:8080
+    networks:
+      - searchgoose
+networks:
+  searchgoose:
+    driver: bridge
