@@ -65,11 +65,11 @@ type Service struct {
 	ConnectionLock    sync.RWMutex
 }
 
-func NewService(transport Transport) *Service {
+func NewService(transport Transport, nodeName string) *Service {
 	address := transport.GetLocalAddress()
 	id := transport.GetNodeId()
 	service := &Service{
-		LocalNode:         state.CreateLocalNode(id, address),
+		LocalNode:         state.CreateLocalNode(id, address, nodeName),
 		Transport:         transport,
 		ConnectionManager: make(map[string]ConnectionEntry),
 		ConnectionLock:    sync.RWMutex{},
@@ -210,7 +210,7 @@ func (h *HandshakeRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(h); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -220,7 +220,7 @@ func HandshakeRequestFromBytes(b []byte) *HandshakeRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data HandshakeRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }
@@ -234,7 +234,7 @@ func (h *HandshakeResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(h); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -244,7 +244,7 @@ func HandshakeResponseFromBytes(b []byte) *HandshakeResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data HandshakeResponse
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }

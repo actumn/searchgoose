@@ -47,6 +47,7 @@ func init() {
 	host := flag.String("host_address", "", "호스트 주소")
 	tcpPort := flag.Int("transport.port", 0, "Transport 연결 노드")
 	httpPort := flag.Int("http.port", 0, "HTTP 연결 노드")
+	nodeName := flag.String("node.name", "", "노드 이름")
 
 	flag.Parse()
 
@@ -54,6 +55,7 @@ func init() {
 	viper.Set("network.host", *host)
 	viper.Set("transport.port", *tcpPort)
 	viper.Set("http.port", *httpPort)
+	viper.Set("node.name", *nodeName)
 
 	nodeId := cluster.GenerateNodeId()
 	logrus.Info("[Node Id]: ", nodeId)
@@ -75,9 +77,10 @@ func start() {
 	host := viper.GetString("network.host") + ":" + viper.GetString("transport.port")
 	seedHost := viper.GetString("discovery.seed_hosts")
 	id := viper.GetString("node.id")
+	name := viper.GetString("node.name")
 
 	tcpTransport = tcp.NewTransport(host, seedHost, id)
-	transportService := transport.NewService(tcpTransport)
+	transportService := transport.NewService(tcpTransport, name)
 	transportService.Start()
 
 	clusterService := cluster.NewService()
@@ -114,6 +117,7 @@ func start() {
 
 	if wait == 1 {
 		logrus.Info("start server...")
+		coordinator.Started = true
 		if err := b.Start(httpPort); err != nil {
 			panic(err)
 		}

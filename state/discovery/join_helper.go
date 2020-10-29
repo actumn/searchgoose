@@ -44,12 +44,12 @@ func (h *JoinHelper) handleStartJoinRequest(channel transport.ReplyChannel, req 
 
 	join := h.joinLeaderInTerm(startJoinReqData)
 
-	h.SendJoinRequest(destination, h.currentTermSupplier(), join, func() {})
+	h.SendJoinRequest(destination, h.currentTermSupplier(), join)
 
 	channel.SendMessage(transport.START_JOIN_ACK, []byte("Send START_JOIN_ACK"))
 }
 
-func (h *JoinHelper) SendJoinRequest(destination state.Node, term int64, join *state.Join, done func()) {
+func (h *JoinHelper) SendJoinRequest(destination state.Node, term int64, join *state.Join) {
 
 	var newJoin state.Join
 	if join == nil {
@@ -103,7 +103,7 @@ func (r *StartJoinRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -113,7 +113,7 @@ func StartJoinRequestFromBytes(b []byte) *StartJoinRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data StartJoinRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }
@@ -128,7 +128,7 @@ func (r *JoinRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -142,7 +142,7 @@ func JoinRequestFromBytes(b []byte) *JoinRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data JoinRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }

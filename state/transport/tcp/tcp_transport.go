@@ -147,7 +147,7 @@ func (t *Transport) Start(address string) {
 						data := recvData.Content
 
 						if strings.Contains(action, "_FAIL") {
-							logrus.Fatalf("Error: %s", string(data))
+							logrus.Warnln("Error: %s", string(data))
 						} else {
 							t.RequestHandlers[action](&ReplyChannel{
 								conn:         conn,
@@ -210,7 +210,7 @@ func (d *DataFormat) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(d); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -220,7 +220,7 @@ func DataFormatFromBytes(b []byte) *DataFormat {
 	decoder := gob.NewDecoder(buffer)
 	var data DataFormat
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }

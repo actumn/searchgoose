@@ -48,11 +48,11 @@ func (f *CoordinatorPeerFinder) handleWakeUp() {
 
 	providedAddr := f.getSeedHosts()
 
-	var inner chan bool
-	inner = make(chan bool, len(providedAddr))
-	done := func() {
-		inner <- true
-	}
+	//var inner chan bool
+	//inner = make(chan bool, len(providedAddr))
+	//done := func() {
+	//	inner <- true
+	//}
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(providedAddr))
@@ -64,7 +64,7 @@ func (f *CoordinatorPeerFinder) handleWakeUp() {
 		logrus.Infof("handleWakeUp: Attempting connection to %s\n", address)
 		go func(address string) {
 			defer wg.Done()
-			f.startProbe(address, done)
+			f.startProbe(address)
 		}(address)
 	}
 	wg.Wait()
@@ -76,31 +76,31 @@ func (f *CoordinatorPeerFinder) handleWakeUp() {
 	//end()
 }
 
-func (f *CoordinatorPeerFinder) startProbe(address string, inner func()) {
+func (f *CoordinatorPeerFinder) startProbe(address string) {
 	if _, ok := f.PeersByAddress[address]; !ok {
-		f.createConnection(address, inner)
+		f.createConnection(address)
 	}
 }
 
-func (f *CoordinatorPeerFinder) createConnection(address string, done func()) {
-	leaderMutex := sync.Mutex{}
+func (f *CoordinatorPeerFinder) createConnection(address string) {
 	f.transportService.ConnectToRemoteNode(address, func(remoteNode *state.Node) {
 		if remoteNode == nil {
 			// 만약 두 개의 seedhost가 있고, 하나는 커낵션이 안 되어 있고,
 			// 나머지 하나가 master였다면?
 
-			leaderMutex.Lock()
-			f.Coordinator.becomeLeader("createConnection")
-			leaderMutex.Unlock()
+			if f.Coordinator.active == false {
+				f.Coordinator.becomeLeader("createConnection")
+			}
+
 			//done()
 			return
 		}
 		f.PeersByAddress[address] = remoteNode
-		f.requestPeers(*remoteNode, f.Coordinator.startPreVote, done)
+		f.requestPeers(*remoteNode, f.Coordinator.startPreVote)
 	})
 }
 
-func (f *CoordinatorPeerFinder) requestPeers(destNode state.Node, next func(), done func()) {
+func (f *CoordinatorPeerFinder) requestPeers(destNode state.Node, next func()) {
 	nowNode := f.getLocalNode()
 	foundPeers := f.getFoundPeers()
 
@@ -129,23 +129,23 @@ func (f *CoordinatorPeerFinder) requestPeers(destNode state.Node, next func(), d
 
 		if master != (state.Node{}) {
 			if master == destNode {
-				f.onActiveMasterFound(destNode, term, done)
+				f.onActiveMasterFound(destNode, term)
 			} else {
-				f.startProbe(master.HostAddress, func() {})
+				f.startProbe(master.HostAddress)
 				f.Coordinator.becomeFollower("requestPeers", master)
 			}
 		}
 
 		for _, peer := range peers {
 			f.transportService.ConnectToRemoteNode(peer.HostAddress, func(remoteNode *state.Node) {
-				f.requestPeers(*remoteNode, func() {}, func() {})
+				f.requestPeers(*remoteNode, func() {})
 			})
 		}
 
 		// start election
-		// next()
+		next()
 
-		done()
+		// done()
 	})
 }
 
@@ -170,7 +170,7 @@ func (f *CoordinatorPeerFinder) handlePeersRequest(channel transport.ReplyChanne
 	for _, peer := range peers {
 		go func(address string) {
 			defer wg.Done()
-			f.startProbe(address, func() {})
+			f.startProbe(address)
 		}(peer.HostAddress)
 	}
 	wg.Wait()
@@ -178,18 +178,14 @@ func (f *CoordinatorPeerFinder) handlePeersRequest(channel transport.ReplyChanne
 	knownPeers := f.getFoundPeers()
 	logrus.Infof("Send Peer Finding RES to %s; %s\n", channel.GetDestAddress(), knownPeers)
 	response.KnownPeers = knownPeers
-	response.Term = f.currentTerm
+	response.Term = f.Coordinator.getCurrentTerm()
 
 	channel.SendMessage(transport.PEERFIND_ACK, response.ToBytes())
 }
 
-func (f *CoordinatorPeerFinder) onActiveMasterFound(leader state.Node, term int64, done func()) {
-	// ensureTermAtLeast(masterNode, term);
-	// joinHelper.sendJoinRequest(masterNode, getCurrentTerm(), joinWithDestination(lastJoin, masterNode, term));
-
+func (f *CoordinatorPeerFinder) onActiveMasterFound(leader state.Node, term int64) {
 	f.Coordinator.ensureTermAtLeast(leader, term)
-	f.Coordinator.JoinHelper.SendJoinRequest(leader, f.Coordinator.getCurrentTerm(), nil, done)
-
+	f.Coordinator.JoinHelper.SendJoinRequest(leader, f.Coordinator.getCurrentTerm(), nil)
 }
 
 func (f *CoordinatorPeerFinder) getFoundPeers() []state.Node {
@@ -221,7 +217,7 @@ func (r *PeersRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -231,7 +227,7 @@ func PeersRequestFromBytes(b []byte) *PeersRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data PeersRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }
@@ -246,7 +242,7 @@ func (r *PeersResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(r); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -256,7 +252,7 @@ func PeersResponseFromBytes(b []byte) *PeersResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data PeersResponse
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }
