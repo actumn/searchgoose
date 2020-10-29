@@ -198,8 +198,9 @@ func NewRestNodesStats(clusterService *cluster.Service, indicesService *indices.
 		stats := monitorService.Stats()
 		// TODO :: find out more elastic way to compute total indices stats
 		indicesStats := indices.Stats{
-			NumDocs:  0,
-			NumBytes: 0,
+			NumDocs:    0,
+			NumDeleted: 0,
+			NumBytes:   0,
 		}
 
 		for _, indexService := range indicesService.Indices {
@@ -207,6 +208,7 @@ func NewRestNodesStats(clusterService *cluster.Service, indicesService *indices.
 				shardStats := shard.Stats()
 
 				indicesStats.NumDocs += shardStats.NumDocs
+				indicesStats.NumDeleted += shardStats.UserData["deletes"].(uint64)
 				indicesStats.NumBytes += shardStats.UserData["num_bytes_used_disk"].(uint64)
 			}
 		}
@@ -272,6 +274,7 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 	nodeStatsMap := map[string]interface{}{}
 	for _, response := range responses {
 		nodeStatsMap[response.Node.Id] = map[string]interface{}{
+			"name":              response.Node.Name + response.Node.Id,
 			"transport_address": response.Node.HostAddress,
 			"host":              response.Node.HostAddress,
 			"ip":                response.Node.HostAddress,
@@ -279,7 +282,7 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 			"indices": map[string]interface{}{
 				"docs": map[string]interface{}{
 					"count":   response.IndicesStats.NumDocs,
-					"deleted": -1,
+					"deleted": response.IndicesStats.NumDeleted,
 				},
 				"store": map[string]interface{}{
 					"size_in_bytes": response.IndicesStats.NumBytes,

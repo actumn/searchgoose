@@ -47,6 +47,7 @@ func (s *Service) deleteIndexStore(idx state.Index) {
 }
 
 type Stats struct {
-	NumDocs  uint64
-	NumBytes uint64
+	NumDocs    uint64
+	NumDeleted uint64
+	NumBytes   uint64
 }
