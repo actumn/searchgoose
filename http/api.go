@@ -157,11 +157,13 @@ func New(
 	})
 	c.pathTrie.insert("/{index}/_doc/{id}", actions.MethodHandlers{
 		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.POST:   actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 		actions.PUT:    actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 	})
 	c.pathTrie.insert("/{index}/{type}/{id}", actions.MethodHandlers{ // deprecated but just for elasticsearch-HQ
 		actions.GET:    actions.NewRestGetDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
+		actions.POST:   actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 		actions.PUT:    actions.NewRestIndexDocId(clusterService, clusterMetadataCreateIndexService, indicesService, indexNameExpressionResolver, transportService),
 		actions.DELETE: actions.NewRestDeleteDoc(clusterService, indicesService, indexNameExpressionResolver, transportService),
 	})

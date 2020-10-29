@@ -117,6 +117,8 @@ func NewRestSearch(clusterService *cluster.Service, indicesService *indices.Serv
 		}
 
 		searchRequest := bleve.NewSearchRequest(q)
+		searchRequest.Highlight = bleve.NewHighlight()
+		//searchRequest.sort
 		r, err := indexShard.Search(searchRequest)
 		if err != nil {
 			logrus.Fatal(err)
@@ -156,9 +158,16 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 	indexExpression := r.PathParams["index"]
 
 	var body map[string]interface{}
-	if err := json.Unmarshal(r.Body, &body); err != nil {
+	if len(r.Body) == 0 {
+		body = map[string]interface{}{
+			"query": map[string]interface{}{
+				"match_all": map[string]interface{}{},
+			},
+		}
+	} else if err := json.Unmarshal(r.Body, &body); err != nil {
 		logrus.Fatal(err)
 	}
+
 	clusterState := h.clusterService.State()
 	indexName := h.indexNameExpressionResolver.ConcreteSingleIndex(*clusterState, indexExpression).Name
 	shardNum := clusterState.Metadata.Indices[indexName].NumberOfShards
@@ -185,7 +194,9 @@ func (h *RestSearch) Handle(r *RestRequest, reply ResponseListener) {
 		d := <-totalResults
 		data.Took += d.Took
 		if d.DocList != nil {
-			data.DocList = append(data.DocList, d.DocList)
+			for _, doc := range d.DocList {
+				data.DocList = append(data.DocList, doc)
+			}
 		}
 		if data.MaxScore <= d.MaxScore {
 			data.MaxScore = d.MaxScore
