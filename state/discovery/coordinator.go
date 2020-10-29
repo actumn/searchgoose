@@ -39,6 +39,10 @@ type Coordinator struct {
 	maxTermSeen int64
 
 	mode Mode
+
+	Done    func()
+	active  bool
+	Started bool
 }
 
 func NewCoordinator(transportService *transport.Service, clusterApplierService *cluster.ApplierService, masterService *cluster.MasterService, persistedState state.PersistedState) *Coordinator {
@@ -65,6 +69,7 @@ func NewCoordinator(transportService *transport.Service, clusterApplierService *
 func (c *Coordinator) Start() {
 	c.CoordinationState = state.CoordinationState{
 		LocalNode:      c.TransportService.LocalNode,
+		JoinVotes:      state.NewVoteCollection(),
 		PersistedState: c.PersistedState,
 		Term:           1,
 	}
@@ -101,7 +106,6 @@ func (c *Coordinator) Start() {
 
 func (c *Coordinator) StartInitialJoin() {
 	c.becomeCandidate("startInitial")
-	// clusterBootstrapService.scheduleUnconfiguredBootstrap();
 }
 
 func (c *Coordinator) becomeCandidate(method string) {
@@ -112,10 +116,14 @@ func (c *Coordinator) becomeCandidate(method string) {
 }
 
 func (c *Coordinator) becomeLeader(method string) {
+
+	c.active = true
+
 	logrus.Infof("%v: Coordinator becoming LEADER in term {%d}\n", method, c.getCurrentTerm())
 	localNode := c.TransportService.GetLocalNode()
 	c.mode = LEADER
 	c.PeerFinder.deactivate(localNode)
+	c.updateCurrentTerm()
 	c.PreVoteCollector.update(NewPreVoteResponse(c.getCurrentTerm()), localNode)
 
 	// make new cluster state
@@ -141,13 +149,10 @@ func (c *Coordinator) becomeLeader(method string) {
 	_, nodes := c.TransportService.GetConnectedPeers()
 	nodes = append(nodes, c.TransportService.GetLocalNode())
 	for _, node := range nodes {
-		logrus.Infof("129, node=%v address=%p", node, &node)
 		newClusterState.Nodes.Nodes[node.Id] = node
 		newClusterState.Nodes.DataNodes[node.Id] = node
 		newClusterState.Nodes.MasterNodes[node.Id] = node
 	}
-
-	logrus.Infof("134, ClusterState=%v", newClusterState.Nodes)
 
 	c.Publish(state.ClusterChangedEvent{
 		State:     *newClusterState,
@@ -166,12 +171,12 @@ func (c *Coordinator) updateMaxTermSeen(term int64) {
 	currentTerm := c.getCurrentTerm()
 
 	if c.mode == LEADER && c.maxTermSeen > currentTerm {
-
+		// leader exit
 	}
 }
 
 func (c *Coordinator) startElection() {
-	localNode := *(c.TransportService.LocalNode)
+	localNode := c.TransportService.GetLocalNode()
 
 	if c.mode == PREVOTING {
 		startJoinRequest := StartJoinRequest{
@@ -191,7 +196,7 @@ func (c *Coordinator) startElection() {
 }
 
 func (c *Coordinator) joinLeaderInTerm(request *StartJoinRequest) *state.Join {
-	localNode := *(c.TransportService.LocalNode)
+	localNode := c.TransportService.GetLocalNode()
 
 	logrus.Infof("joinLeaderInTerm: for %v with term={%d}\n", request.SourceNode, request.Term)
 	if request.Term <= c.getCurrentTerm() {
@@ -202,7 +207,7 @@ func (c *Coordinator) joinLeaderInTerm(request *StartJoinRequest) *state.Join {
 
 	c.CoordinationState.Term = request.Term
 	c.CoordinationState.JoinVotes = state.NewVoteCollection()
-	c.CoordinationState.PublishVotes = state.NewVoteCollection()
+	//c.CoordinationState.PublishVotes = state.NewVoteCollection()
 
 	join := state.NewJoin(localNode, request.SourceNode, c.getCurrentTerm())
 	c.lastJoin = join
@@ -210,7 +215,7 @@ func (c *Coordinator) joinLeaderInTerm(request *StartJoinRequest) *state.Join {
 	c.PeerFinder.currentTerm = c.getCurrentTerm()
 
 	if c.mode != PREVOTING {
-		c.becomeCandidate("joinLeaderInTerm")
+		//c.becomeCandidate("joinLeaderInTerm")
 	} else {
 		// followersChecker.updateFastResponseState(getCurrentTerm(), mode);
 		c.PreVoteCollector.update(NewPreVoteResponse(c.getCurrentTerm()), c.ApplierState.Nodes.MasterNode())
@@ -221,15 +226,17 @@ func (c *Coordinator) joinLeaderInTerm(request *StartJoinRequest) *state.Join {
 }
 
 func (c *Coordinator) handleJoinRequest(channel transport.ReplyChannel, req []byte) {
-	// transportService.connectToNode -> 대체 왜?
-	joinReqData := JoinRequestFromBytes(req)
-	logrus.Infof("handleJoinRequest: as {%d}, handling %v\n", c.mode, joinReqData)
-	c.updateMaxTermSeen(joinReqData.MinimumTerm)
-	c.handleJoin(joinReqData.Join)
-	//  joinAccumulator.handleJoinRequest(joinRequest.getSourceNode(), joinCallback);
-	if c.CoordinationState.ElectionWon == true {
-		c.becomeLeader("handleJoinRequest")
-	}
+	c.TransportService.ConnectToRemoteNode(channel.GetDestAddress(), func(remoteNode *state.Node) {
+		joinReqData := JoinRequestFromBytes(req)
+		logrus.Infof("handleJoinRequest: as {%d}, handling %v\n", c.mode, joinReqData)
+		c.updateMaxTermSeen(joinReqData.GetTerm())
+		if joinReqData.Join != (state.Join{}) {
+			c.handleJoin(joinReqData.Join)
+		}
+		if c.CoordinationState.ElectionWon == true {
+			c.becomeLeader("handleJoinRequest")
+		}
+	})
 }
 
 func (c *Coordinator) handleJoin(join state.Join) {
@@ -240,24 +247,32 @@ func (c *Coordinator) handleJoin(join state.Join) {
 	}
 
 	if c.CoordinationState.ElectionWon == false {
-		if c.getCurrentTerm() != join.Term {
-			logrus.Printf("handleJoin: ignored join due to term mismatch current={%d} term={%d}", c.getCurrentTerm(), join.Term)
-			return
-		}
-		c.CoordinationState.JoinVotes.AddJoinVote(join)
+		//if c.getCurrentTerm() != join.Term {
+		//	logrus.Infof("handleJoin: ignored join due to term mismatch current={%d} term={%d}", c.getCurrentTerm(), join.Term)
+		//	return
+		//}
 
-		nodeIds, _ := c.TransportService.GetConnectedPeers()
-		nodeIds = append(nodeIds, localNode.Id)
-		c.CoordinationState.ElectionWon = c.CoordinationState.IsElectionQuorum(nodeIds)
+		c.CoordinationState.ElectionWon = true
+		logrus.Infof("handleJoin: election won in term={%d} with %v\n", c.getCurrentTerm(), c.CoordinationState.JoinVotes)
 
-		if c.CoordinationState.ElectionWon {
-			logrus.Infof("handleJoin: election won in term={%d} with %v\n", c.getCurrentTerm(), c.CoordinationState.JoinVotes)
-		}
+		//c.CoordinationState.JoinVotes.AddJoinVote(join)
+		//
+		//nodeIds, _ := c.TransportService.GetConnectedPeers()
+		//nodeIds = append(nodeIds, localNode.Id)
+		//c.CoordinationState.ElectionWon = c.CoordinationState.IsElectionQuorum(nodeIds)
+		//
+		//if c.CoordinationState.ElectionWon {
+		//	logrus.Infof("handleJoin: election won in term={%d} with %v\n", c.getCurrentTerm(), c.CoordinationState.JoinVotes)
+		//}
 	}
 }
 
 func (c *Coordinator) getCurrentTerm() int64 {
 	return c.CoordinationState.Term
+}
+
+func (c *Coordinator) updateCurrentTerm() {
+	c.CoordinationState.Term += 1
 }
 
 func (c *Coordinator) ensureTermAtLeast(sourceNode state.Node, targetTerm int64) *state.Join {
@@ -278,7 +293,6 @@ func (c *Coordinator) Publish(event state.ClusterChangedEvent) {
 
 	newState := event.State
 	nodes := newState.Nodes.Nodes
-	logrus.Infof("262, %v", nodes)
 	for _, node := range nodes {
 		logrus.Infof("Publish: leader=%v publish to DestNode=%v", c.TransportService.LocalNode, node)
 		c.TransportService.SendRequest(node, transport.PUBLISH_REQ, newState.ToBytes(), func(response []byte) {
@@ -300,77 +314,21 @@ func (c *Coordinator) handlePublish(channel transport.ReplyChannel, req []byte) 
 	c.MasterService.ClusterState = acceptedState
 	c.ClusterApplierService.OnNewState(acceptedState)
 
+	for _, node := range acceptedState.Nodes.Nodes {
+		go c.TransportService.ConnectToRemoteNode(node.HostAddress, func(node *state.Node) {})
+	}
+
+	if c.Started == false {
+		c.Done()
+	}
+
 	channel.SendMessage(transport.PUBLISH_ACK, []byte{})
 }
 
-// PeerFinder
-type CoordinatorPeerFinder struct {
-	Coordinator *Coordinator
-
-	mode        *Mode
-	currentTerm int64
-
-	transportService  *transport.Service
-	LastAcceptedNodes *state.Nodes
-	PeersByAddress    map[string]*state.Node
-	active            bool
-
-	leader *state.Node
-}
-
-func NewCoordinatorPeerFinder(coordinator *Coordinator) *CoordinatorPeerFinder {
-	f := &CoordinatorPeerFinder{
-		Coordinator:      coordinator,
-		transportService: coordinator.TransportService,
-		PeersByAddress:   make(map[string]*state.Node),
-	}
-
-	return f
-}
-
-func (f *CoordinatorPeerFinder) activate(lastAcceptedNodes *state.Nodes) {
-	f.LastAcceptedNodes = lastAcceptedNodes
-	f.active = true
-	f.handleWakeUp()
-	// f.onFoundPeersUpdated()
-}
-
-func (f *CoordinatorPeerFinder) handleWakeUp() {
-	// peer.handleWakeUp()
-	providedAddr := f.transportService.Transport.GetSeedHosts()
-	for _, address := range providedAddr {
-		logrus.Infof("Attempting connection to %s\n", address)
-		go f.startProbe(address)
-	}
-}
-
-func (f *CoordinatorPeerFinder) startProbe(address string /*wg *sync.WaitGroup*/) {
-	if _, ok := f.PeersByAddress[address]; !ok {
-		f.createConnection(address)
-	}
-}
-
-func (f *CoordinatorPeerFinder) createConnection(address string) {
-	f.transportService.ConnectToRemoteNode(address, func(remoteNode *state.Node) {
-		f.PeersByAddress[address] = remoteNode
-		_, foundPeers := f.transportService.GetConnectedPeers()
-		f.transportService.RequestPeers(*remoteNode, foundPeers, f.onFoundPeersUpdated)
-	})
-}
-
-func (f *CoordinatorPeerFinder) onFoundPeersUpdated() {
-	if f.Coordinator.mode == CANDIDATE {
-		f.Coordinator.mode = PREVOTING
-		f.startElectionScheduler()
-	} else {
-		logrus.Println("PreVoting already stared")
-		return
-	}
-}
-
-func (f *CoordinatorPeerFinder) startElectionScheduler() {
-	if f.Coordinator.mode == PREVOTING {
-		f.Coordinator.PreVoteCollector.Start()
+func (c *Coordinator) startPreVote() {
+	if c.mode != CANDIDATE {
+		c.mode = PREVOTING
+		c.PreVoteCollector.Start()
 	}
 }
 
@@ -387,17 +345,3 @@ func (f *CoordinatorPeerFinder) deactivate(leader state.Node) {
 	*/
 
 }
-
-func (f *CoordinatorPeerFinder) getFoundPeers() ([]string, []state.Node) {
-	ids := make([]string, 0, len(f.PeersByAddress))
-	values := make([]state.Node, 0, len(f.PeersByAddress))
-
-	for _, v := range f.PeersByAddress {
-		ids = append(ids, v.Id)
-		values = append(values, *v)
-	}
-
-	return ids, values
-}
-
-// Publisher

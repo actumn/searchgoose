@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/viper"
 	"runtime"
 	"strings"
-	//"time"
 )
 
 func main() {
@@ -48,6 +47,7 @@ func init() {
 	host := flag.String("host_address", "", "호스트 주소")
 	tcpPort := flag.Int("transport.port", 0, "Transport 연결 노드")
 	httpPort := flag.Int("http.port", 0, "HTTP 연결 노드")
+	nodeName := flag.String("node.name", "", "노드 이름")
 
 	flag.Parse()
 
@@ -55,6 +55,7 @@ func init() {
 	viper.Set("network.host", *host)
 	viper.Set("transport.port", *tcpPort)
 	viper.Set("http.port", *httpPort)
+	viper.Set("node.name", *nodeName)
 
 	nodeId := cluster.GenerateNodeId()
 	logrus.Info("[Node Id]: ", nodeId)
@@ -64,14 +65,22 @@ func init() {
 
 func start() {
 
+	// for signal handling
+	var outer chan int
+	outer = make(chan int, 1)
+	done := func() {
+		outer <- 1
+	}
+
 	var tcpTransport transport.Transport
 
 	host := viper.GetString("network.host") + ":" + viper.GetString("transport.port")
 	seedHost := viper.GetString("discovery.seed_hosts")
 	id := viper.GetString("node.id")
-	tcpTransport = tcp.NewTransport(host, seedHost, id)
+	name := viper.GetString("node.name")
 
-	transportService := transport.NewService(tcpTransport)
+	tcpTransport = tcp.NewTransport(host, seedHost, id)
+	transportService := transport.NewService(tcpTransport, name)
 	transportService.Start()
 
 	clusterService := cluster.NewService()
@@ -81,6 +90,7 @@ func start() {
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator := discovery.NewCoordinator(transportService, clusterService.ApplierService, clusterService.MasterService, gateway.PersistedState)
+	coordinator.Done = done
 
 	indicesService := indices.NewService()
 	indicesClusterStateService := indices.NewClusterStateService(indicesService)
@@ -96,16 +106,20 @@ func start() {
 	gateway.Start(transportService, clusterService, persistClusterStateService)
 
 	coordinator.Start()
-	//time.Sleep(time.Duration(15) * time.Second)
-
 	coordinator.StartInitialJoin()
-	//time.Sleep(time.Duration(1000) * time.Second)
+
+	wait := <-outer
+
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, clusterMetadataIndexAliasService, indicesService, transportService, indexNameExpressionResolver)
 	httpPort := ":" + viper.GetString("http.port")
-	logrus.Info("start server...")
-	if err := b.Start(httpPort); err != nil {
-		panic(err)
+
+	if wait == 1 {
+		logrus.Info("start server...")
+		coordinator.Started = true
+		if err := b.Start(httpPort); err != nil {
+			panic(err)
+		}
 	}
 }

@@ -18,10 +18,12 @@ type Node struct {
 	//roles map[DiscoveryNodeRole]struct{}
 }
 
-func CreateLocalNode(id string, address string) *Node {
-	//nodeName := fmt.Sprintf("sg-node-%d", rand.Intn(10))
+func CreateLocalNode(id string, address string, name string) *Node {
+	if name == "" {
+		name = id
+	}
 	return &Node{
-		// Name:        nodeName,
+		Name:        name,
 		Id:          id,
 		HostAddress: address,
 	}
@@ -31,7 +33,7 @@ func (n *Node) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(n); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -41,7 +43,7 @@ func NodeFromBytes(b []byte) *Node {
 	decoder := gob.NewDecoder(buffer)
 	var node Node
 	if err := decoder.Decode(&node); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return &node
 }
