@@ -274,7 +274,7 @@ func (h *RestNodesStats) Handle(r *RestRequest, reply ResponseListener) {
 	nodeStatsMap := map[string]interface{}{}
 	for _, response := range responses {
 		nodeStatsMap[response.Node.Id] = map[string]interface{}{
-			"name":              response.Node.Name + response.Node.Id,
+			"name":              response.Node.Name,
 			"transport_address": response.Node.HostAddress,
 			"host":              response.Node.HostAddress,
 			"ip":                response.Node.HostAddress,

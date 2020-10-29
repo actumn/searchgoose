@@ -58,13 +58,13 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 	}
 
 	var nodesList []map[string]interface{}
-	for n, node := range clusterState.Nodes.Nodes {
+	for _, node := range clusterState.Nodes.Nodes {
 		nodeStats := nodeStatsMap[node.Id]
 		heapPer := nodeStats.Runtime.HeapAlloc * 100 / nodeStats.Runtime.HeapSys
 		nodesList = append(nodesList, map[string]interface{}{
 			"id":   node.Id,
 			"m":    "*", // master
-			"n":    n + node.Name,
+			"n":    node.Name,
 			"u":    "44m",    // uptime
 			"role": "dilmrt", // node role
 			//"hc":         "156.8mb", // heap current
