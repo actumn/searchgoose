@@ -5,4 +5,4 @@ services:
     ports:
       - 5000:5000
     environment:
-      - HQ_DEFAULT_URL=http://172.17.0.1:8080
+      - HQ_DEFAULT_URL=http://192.168.0.7:8080

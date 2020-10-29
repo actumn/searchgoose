@@ -10,15 +10,16 @@ import (
 )
 
 type PreVoteCollector struct {
-	state     map[state.Node]*PreVoteResponse //tuple
-	preVotes  map[state.Node]*PreVoteResponse //map
-	wirteLock sync.RWMutex
+	state    map[state.Node]*PreVoteResponse //tuple
+	preVotes map[state.Node]*PreVoteResponse //map
 
 	electionStarted bool
 
 	transportService  *transport.Service
 	startElection     func()
 	updateMaxTermSeen func(term int64)
+
+	Lock sync.RWMutex
 }
 
 func NewPreVoteCollector(transportService *transport.Service, startElection func(), updateMaxTermSeen func(term int64)) *PreVoteCollector {
@@ -29,14 +30,15 @@ func NewPreVoteCollector(transportService *transport.Service, startElection func
 		transportService:  transportService,
 		startElection:     startElection,
 		updateMaxTermSeen: updateMaxTermSeen,
+		Lock:              sync.RWMutex{},
 	}
 
 	return p
 }
 
 func (p *PreVoteCollector) Start() {
-	localNode := *(p.transportService.LocalNode)
-	preVoteReqData := PreVoteRequest{
+	localNode := p.transportService.GetLocalNode()
+	request := PreVoteRequest{
 		SourceNode: localNode,
 		Term:       p.getPreVoteResponse().CurrentTerm,
 	}
@@ -44,13 +46,12 @@ func (p *PreVoteCollector) Start() {
 	_, broadcastNodes := p.transportService.GetConnectedPeers()
 	broadcastNodes = append(broadcastNodes, localNode)
 
-	logrus.Infof("PreVoteCollector{SourceNode=%v} requesting pre-votes from %s\n", localNode, broadcastNodes)
+	logrus.Infof("PreVoteCollector: SourceNode=%v requesting pre-votes from %s\n", localNode, broadcastNodes)
 
 	for _, node := range broadcastNodes {
-		request := preVoteReqData.ToBytes()
 		remoteNode := node
-		logrus.Infof("PreVoteRequest%v to DestNode=%v\n", preVoteReqData, remoteNode)
-		go p.transportService.SendRequest(node, transport.PREVOTE_REQ, request, func(res []byte) {
+		logrus.Infof("PreVoteRequest%v to DestNode=%v\n", request, remoteNode)
+		go p.transportService.SendRequest(node, transport.PREVOTE_REQ, request.ToBytes(), func(res []byte) {
 			data := PreVoteResponseFromBytes(res)
 			logrus.Infof("PreVoteResponse%v from DestNode=%v\n", data, remoteNode)
 			p.handlePreVoteResponse(data, remoteNode)
@@ -71,9 +72,7 @@ func (p *PreVoteCollector) handlePreVoteRequest(channel transport.ReplyChannel, 
 	// if the current node has not received the information that a node has been elected as the leader
 	if leader != (state.Node{}) {
 		logrus.Infof("Election already finished, won leader=%v", leader)
-		errMsg := "Election already finished"
-		channel.SendMessage(transport.PREVOTE_FAIL, []byte(errMsg))
-		return
+		preVoteResData.Err = "Election already finished"
 	}
 
 	response := preVoteResData.ToBytes()
@@ -116,24 +115,30 @@ func (p *PreVoteCollector) handlePreVoteResponse(response *PreVoteResponse, send
 	p.electionStarted = true
 	logrus.Infof("%v add %v from PrevoteResponse=%v\n, starting election\n", p.transportService.LocalNode, response, sender)
 
+	//
 	p.startElection()
 }
 
 func (p *PreVoteCollector) update(preVoteResponse *PreVoteResponse, leader state.Node) {
+	mutex := sync.RWMutex{}
 	if leader == (state.Node{}) {
+		mutex.Lock()
 		p.state[p.getLeader()] = preVoteResponse
+		mutex.Unlock()
 	} else {
+		mutex.Lock()
 		delete(p.state, p.getLeader())
 		p.state[leader] = preVoteResponse
+		mutex.Unlock()
 	}
 	logrus.Infof("Updating with preVoteResponse=%v, leader=%v\n", preVoteResponse, leader)
 
 }
 
 func (p *PreVoteCollector) SetVote(key state.Node, value *PreVoteResponse) {
-	p.wirteLock.Lock()
+	p.Lock.Lock()
 	p.preVotes[key] = value
-	p.wirteLock.Unlock()
+	p.Lock.Unlock()
 }
 
 func (p *PreVoteCollector) getLeader() state.Node {
@@ -167,7 +172,7 @@ func (p *PreVoteRequest) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(p); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -177,7 +182,7 @@ func PreVoteRequestFromBytes(b []byte) *PreVoteRequest {
 	decoder := gob.NewDecoder(buffer)
 	var data PreVoteRequest
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatal(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }
@@ -186,6 +191,7 @@ type PreVoteResponse struct {
 	CurrentTerm      int64
 	lastAcceptedTerm int64
 	// lastAcceptedVersion
+	Err string
 }
 
 func NewPreVoteResponse(currentTerm int64) *PreVoteResponse {
@@ -198,7 +204,7 @@ func (p *PreVoteResponse) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(p); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -208,7 +214,7 @@ func PreVoteResponseFromBytes(b []byte) *PreVoteResponse {
 	decoder := gob.NewDecoder(buffer)
 	var data PreVoteResponse
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }

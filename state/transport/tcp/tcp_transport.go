@@ -21,6 +21,7 @@ type Connection struct {
 	conn         net.Conn
 	localAddress string
 	destAddress  string
+	err          string
 }
 
 func (c *Connection) SendRequest(action string, content []byte, callback func(byte []byte)) {
@@ -42,7 +43,7 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 		n, err := c.conn.Read(recvBuf)
 		if err != nil {
 			// logrus.Fatalf("Fail to get response from %s; err: %v", address, err)
-			logrus.Fatalf("Fail to get response; err: %v", err)
+			logrus.Warnf("Fail to get response; err: %v", err)
 			return
 		}
 		response := DataFormatFromBytes(recvBuf[:n])
@@ -61,6 +62,10 @@ func (c *Connection) GetSourceAddress() string {
 
 func (c *Connection) GetDestAddress() string {
 	return c.destAddress
+}
+
+func (c *Connection) GetMessage() string {
+	return c.err
 }
 
 type ReplyChannel struct {
@@ -91,11 +96,11 @@ func (c *ReplyChannel) GetDestAddress() string {
 }
 
 func NewTransport(hostAddress string, seedHost string, nodeId string) *Transport {
-
 	var seedHosts []string
 	if len(seedHost) > 0 {
 		seedHosts = strings.Split(seedHost, ",")
 	}
+
 	return &Transport{
 		LocalAddress:    hostAddress,
 		LocalNodeId:     nodeId,
@@ -142,7 +147,7 @@ func (t *Transport) Start(address string) {
 						data := recvData.Content
 
 						if strings.Contains(action, "_FAIL") {
-							logrus.Fatalf("Error: %s", string(data))
+							logrus.Warnln("Error: %s", string(data))
 						} else {
 							t.RequestHandlers[action](&ReplyChannel{
 								conn:         conn,
@@ -160,8 +165,13 @@ func (t *Transport) Start(address string) {
 func (t *Transport) OpenConnection(address string, callback func(conn transport.Connection)) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		logrus.Fatalf("Failed to connect to %s : %v", address, err)
+		logrus.Warnf("Failed to connect to %s : %v", address, err)
+		callback(&Connection{
+			err: "Failed to connect to " + address,
+		})
+		return
 	}
+
 	logrus.Info("Success on connecting ", address)
 
 	c := &Connection{
@@ -200,7 +210,7 @@ func (d *DataFormat) ToBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(d); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return buffer.Bytes()
 }
@@ -210,7 +220,7 @@ func DataFormatFromBytes(b []byte) *DataFormat {
 	decoder := gob.NewDecoder(buffer)
 	var data DataFormat
 	if err := decoder.Decode(&data); err != nil {
-		logrus.Fatalln(err)
+		logrus.Warnln(err)
 	}
 	return &data
 }
