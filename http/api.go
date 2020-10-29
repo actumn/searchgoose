@@ -150,6 +150,9 @@ func New(
 	c.pathTrie.insert("/_cat/indices", actions.MethodHandlers{
 		actions.GET: actions.NewRestCatIndices(clusterService, indexNameExpressionResolver, transportService),
 	})
+	c.pathTrie.insert("/_cat/shards/{index}", actions.MethodHandlers{
+		actions.GET: actions.NewRestCatShards(clusterService, indexNameExpressionResolver, transportService),
+	})
 
 	//////////////////////////// cluster //////////////////////////////////
 	c.pathTrie.insert("/_cluster/health", actions.MethodHandlers{
