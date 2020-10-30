@@ -197,13 +197,17 @@ func (h *RestCatShards) Handle(r *RestRequest, reply ResponseListener) {
 	var shardsInfo []map[string]interface{}
 	for _, indexRouting := range clusterState.RoutingTable.IndicesRouting {
 		for _, shardRouting := range indexRouting.Shards {
+			storeSize, existing := shardsStats[shardRouting.Primary].UserData["num_bytes_used_disk"]
+			if !existing {
+				storeSize = 0
+			}
 			shardsInfo = append(shardsInfo, map[string]interface{}{
 				"index":  shardRouting.ShardId.Index.Name,
 				"shard":  shardRouting.ShardId.ShardId,
 				"prirep": "p",
 				"state":  "STARTED",
 				"docs":   shardsStats[shardRouting.Primary].NumDocs,
-				"store":  common.IBytes(shardsStats[shardRouting.Primary].UserData["num_bytes_used_disk"].(uint64)),
+				"store":  common.IBytes(storeSize.(uint64)),
 				"node":   shardRouting.Primary.CurrentNodeId,
 			})
 		}
