@@ -29,13 +29,13 @@ $ docker build . --rm --tag searchgoose:latest
 ## Run
 ### Single mode
 ```shell script
-$ go run main.go -host_address=127.0.0.1 -transport.port=8180 -http.port=8080
+$ go run main.go -transport.port=8180 -http.port=8080
 ```
 ### Clustering mode
 ```shell script
-$ go run main.go -seed_hosts=127.0.0.1:8179,127.0.0.1:8181 -host_address=127.0.0.1 -transport.port=8180 -http.port=8080
-$ go run main.go -seed_hosts=127.0.0.1:8180 -host_address=127.0.0.1 -transport.port=8179 -http.port=8081
-$ go run main.go -seed_hosts=127.0.0.1:8180 -host_address=127.0.0.1 -transport.port=8181 -http.port=8082
+$ go run main.go -transport.port=8180 -http.port=8080
+$ go run main.go -seed_hosts=127.0.0.1:8180 -transport.port=8179 -http.port=8081
+$ go run main.go -seed_hosts=127.0.0.1:8180 -transport.port=8181 -http.port=8082
 ```
 
 ## API
