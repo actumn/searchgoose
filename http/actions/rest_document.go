@@ -60,8 +60,8 @@ type RestIndexDoc struct {
 func NewRestIndexDoc(clusterService *cluster.Service, createIndexService *cluster.MetadataCreateIndexService, indicesService *indices.Service, indexNameExpressionResolver *indices.NameExpressionResolver, transportService *transport.Service) *RestIndexDoc {
 	// Handle primary shard request
 	transportService.RegisterRequestHandler(IndexAction, func(channel transport.ReplyChannel, req []byte) {
-		logrus.Info("indexAction on primary shard")
 		request := indexRequestFromBytes(req)
+		logrus.Info("indexAction on primary shard ", request.Id)
 
 		indexService, _ := indicesService.IndexService(request.ShardId.Index.Uuid)
 		indexShard, _ := indexService.Shard(request.ShardId.ShardId)
@@ -75,7 +75,7 @@ func NewRestIndexDoc(clusterService *cluster.Service, createIndexService *cluste
 		if err := indexShard.Index(request.Id, body); err != nil {
 			logrus.Fatal(err)
 		}
-		channel.SendMessage("", []byte("success"))
+		channel.SendMessage("", []byte(request.Id))
 	})
 
 	return &RestIndexDoc{
@@ -126,7 +126,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 		ShardId: shardRouting.ShardId,
 	}
 	h.transportService.SendRequest(clusterState.Nodes.Nodes[shardRouting.CurrentNodeId], IndexAction, indexRequest.toBytes(), func(response []byte) {
-		logrus.Info("callback success")
+		logrus.Info("callback success ", string(response), ", req Id: ", r.ID)
 		reply(RestResponse{
 			StatusCode: 200,
 			Body: map[string]interface{}{
@@ -135,6 +135,7 @@ func (h *RestIndexDoc) Handle(r *RestRequest, reply ResponseListener) {
 				"_id":      documentId,
 				"_version": 1,
 				"result":   "created",
+				"req_body": body,
 				"_shards": map[string]interface{}{
 					"total":      2,
 					"successful": 1,

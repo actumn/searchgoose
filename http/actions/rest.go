@@ -13,6 +13,7 @@ const (
 type MethodHandlers map[RestMethod]RestHandler
 
 type RestRequest struct {
+	ID          uint64
 	Path        string
 	Method      RestMethod
 	PathParams  map[string]string

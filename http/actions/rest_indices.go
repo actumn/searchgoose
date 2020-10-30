@@ -88,7 +88,7 @@ func NewRestIndicesStatsAction(clusterService *cluster.Service, indicesService *
 			ShardStats:  shardStats,
 		}
 
-		channel.SendMessage("", indicesStatsRes.toBytes())
+		channel.SendMessage(IndicesStatsAction, indicesStatsRes.toBytes())
 	})
 
 	return &RestIndicesStatsAction{

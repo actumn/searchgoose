@@ -33,9 +33,9 @@ $ go run main.go -transport.port=8180 -http.port=8080
 ```
 ### Clustering mode
 ```shell script
-$ go run main.go -transport.port=8180 -http.port=8080
-$ go run main.go -seed_hosts=127.0.0.1:8180 -transport.port=8179 -http.port=8081
-$ go run main.go -seed_hosts=127.0.0.1:8180 -transport.port=8181 -http.port=8082
+$ go run main.go -node.name=sg-node-01 -transport.port=8180 -http.port=8080
+$ go run main.go -node.name=sg-node-02 -seed_hosts=127.0.0.1:8180 -transport.port=8179 -http.port=8081
+$ go run main.go -node.name=sg-node-03 -seed_hosts=127.0.0.1:8180 -transport.port=8181 -http.port=8082
 ```
 
 ## API
