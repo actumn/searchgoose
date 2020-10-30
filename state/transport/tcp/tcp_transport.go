@@ -46,24 +46,16 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 		logrus.Errorf("Fail to send request; err:%v\n", err)
 	}
 	go func() {
-		recvBuf := make([]byte, 4096)
 		lengthBuf := make([]byte, 4)
 		if _, err := c.conn.Read(lengthBuf); err != nil {
 			logrus.Fatalf("Failed to read msg length; err: %v", err)
 		}
 		msgLength := binary.LittleEndian.Uint32(lengthBuf)
-
-		var buf bytes.Buffer
-		for 0 < msgLength {
-			if n, err := c.conn.Read(recvBuf); err != nil {
-				logrus.Fatalf("Fail to get response; err: %v", err)
-			} else if 0 < n {
-				data := recvBuf[:n]
-				buf.Write(data)
-				msgLength -= uint32(n)
-			}
+		recvBuf := make([]byte, int(msgLength))
+		if _, err := io.ReadFull(c.conn, recvBuf); err != nil {
+			logrus.Fatalf("Fail to get response; err: %v", err)
 		}
-		response := DataFormatFromBytes(buf.Bytes())
+		response := DataFormatFromBytes(recvBuf)
 		logrus.Infof("Receive %s from %s\n", response.Action, response.Source)
 		if strings.Contains(response.Action, "_FAIL") {
 			logrus.Warnf("%s", string(response.Content))
@@ -172,7 +164,6 @@ func (t *Transport) Start(port int) {
 			}
 			go func(conn net.Conn) {
 				for {
-					recvBuf := make([]byte, 4096)
 					lengthBuf := make([]byte, 4)
 					if _, err := conn.Read(lengthBuf); err != nil {
 						if io.EOF == err {
@@ -183,21 +174,15 @@ func (t *Transport) Start(port int) {
 						return
 					}
 					msgLength := binary.LittleEndian.Uint32(lengthBuf)
-
-					var buf bytes.Buffer
-					for 0 < msgLength {
-						if n, err := conn.Read(recvBuf); err != nil {
-							logrus.Errorf("Fail to get response; err: %v", err)
-							return
-						} else if 0 < n {
-							data := recvBuf[:n]
-							buf.Write(data)
-							msgLength -= uint32(n)
-						}
+					recvBuf := make([]byte, int(msgLength))
+					n, err := io.ReadFull(conn, recvBuf)
+					if err != nil {
+						logrus.Errorf("Fail to get response; err: %v", err)
+						return
 					}
-					if 0 < buf.Len() {
+					if 0 < n {
 						// Receive request data
-						recvData := DataFormatFromBytes(buf.Bytes())
+						recvData := DataFormatFromBytes(recvBuf)
 						action := recvData.Action
 						data := recvData.Content
 

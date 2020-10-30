@@ -11,6 +11,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"io/ioutil"
 	"net/http"
+	"sync"
 )
 
 func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
@@ -82,8 +83,8 @@ func (c *RequestController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		request.PathParams = params
 		if err != nil {
 			logrus.Warn(r.Method, " ", request.Path, " ", err)
-			w.WriteHeader(400)
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(400)
 			if err := json.NewEncoder(w).Encode(map[string]string{
 				"msg": "no route",
 			}); err != nil {
@@ -101,7 +102,10 @@ func (c *RequestController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 		handler.Handle(&request, func(response actions.RestResponse) {
+			defer wg.Done()
 			var method string
 			switch request.Method {
 			case actions.GET:
@@ -118,12 +122,13 @@ func (c *RequestController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				method = "UNKNOWN"
 			}
 			logrus.Debug("reply on ", method, " ", request.Path)
-			w.WriteHeader(response.StatusCode)
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(response.StatusCode)
 			if err := json.NewEncoder(w).Encode(response.Body); err != nil {
 				logrus.Error(err)
 			}
 		})
+		wg.Wait()
 		return
 	}
 }
@@ -159,7 +164,10 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 		handler.Handle(&request, func(response actions.RestResponse) {
+			defer wg.Done()
 			var method string
 			switch request.Method {
 			case actions.GET:
@@ -182,6 +190,7 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 				logrus.Error(err)
 			}
 		})
+		wg.Wait()
 		return
 	}
 }
@@ -333,6 +342,6 @@ func New(
 }
 
 func (b *Bootstrap) Start(port string) error {
-	//return b.s.ListenAndServe(port)
-	return http.ListenAndServe(port, b.c)
+	return b.s.ListenAndServe(port)
+	//return http.ListenAndServe(port, b.c)
 }
