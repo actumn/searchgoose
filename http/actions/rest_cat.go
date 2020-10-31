@@ -61,9 +61,15 @@ func (h *RestCatNodes) Handle(r *RestRequest, reply ResponseListener) {
 	for _, node := range clusterState.Nodes.Nodes {
 		nodeStats := nodeStatsMap[node.Id]
 		heapPer := nodeStats.Runtime.HeapAlloc * 100 / nodeStats.Runtime.HeapSys
+		var m string
+		if node.Id == clusterState.Nodes.MasterNodeId {
+			m = "*"
+		} else {
+			m = "m"
+		}
 		nodesList = append(nodesList, map[string]interface{}{
 			"id":   node.Id,
-			"m":    "*", // master
+			"m":    m, // master
 			"n":    node.Name,
 			"u":    "44m",    // uptime
 			"role": "dilmrt", // node role
