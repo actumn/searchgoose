@@ -10,6 +10,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
@@ -30,6 +31,8 @@ type Connection struct {
 	destAddress      string
 	err              string
 	responseHandlers map[uint64]func(byte []byte)
+	wLock            sync.Mutex
+	rLock            sync.Mutex
 }
 
 func (c *Connection) SendRequest(action string, content []byte, callback func(byte []byte)) {
@@ -48,6 +51,8 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 	bytesBuf := request.toBytes()
 	lengthBuf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lengthBuf, uint32(len(bytesBuf)))
+	c.wLock.Lock()
+	defer c.wLock.Unlock()
 	if _, err := c.conn.Write(lengthBuf); err != nil {
 		logrus.Errorf("Failed to send msg length; err: %v", err)
 	}
@@ -55,6 +60,8 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 		logrus.Errorf("Fail to send request; err:%v\n", err)
 	}
 	go func() {
+		c.rLock.Lock()
+		defer c.rLock.Unlock()
 		lengthBuf := make([]byte, 4)
 		if _, err := c.conn.Read(lengthBuf); err != nil {
 			logrus.Fatalf("Failed to read msg length; err: %v", err)

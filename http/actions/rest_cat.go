@@ -199,7 +199,7 @@ func (h *RestCatShards) Handle(r *RestRequest, reply ResponseListener) {
 		for _, shardRouting := range indexRouting.Shards {
 			storeSize, existing := shardsStats[shardRouting.Primary].UserData["num_bytes_used_disk"]
 			if !existing {
-				storeSize = 0
+				storeSize = uint64(0)
 			}
 			shardsInfo = append(shardsInfo, map[string]interface{}{
 				"index":  shardRouting.ShardId.Index.Name,
