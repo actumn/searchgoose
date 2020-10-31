@@ -9,8 +9,6 @@ import (
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
-	"io/ioutil"
-	"net/http"
 	"sync"
 )
 
@@ -43,94 +41,8 @@ func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 	return request
 }
 
-func requestFromHttp(r *http.Request) actions.RestRequest {
-	body, _ := ioutil.ReadAll(r.Body)
-	request := actions.RestRequest{
-		//ID: r.,
-		Path: r.URL.Path,
-		Body: body,
-	}
-
-	switch r.Method {
-	case "GET":
-		request.Method = actions.GET
-	case "POST":
-		request.Method = actions.POST
-	case "PUT":
-		request.Method = actions.PUT
-	case "DELETE":
-		request.Method = actions.DELETE
-	case "HEAD":
-		request.Method = actions.HEAD
-	}
-
-	return request
-}
-
 type RequestController struct {
 	pathTrie *pathTrie
-}
-
-func (c *RequestController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	request := requestFromHttp(r)
-	if request.Path == "/favicon.ico" {
-		return
-	}
-	logrus.Info(r.Method, " ", r.RequestURI, " ", string(request.Body))
-	allHandlers := c.pathTrie.retrieveAll(request.Path)
-	for {
-		h, params, err := allHandlers()
-		request.PathParams = params
-		if err != nil {
-			logrus.Warn(r.Method, " ", request.Path, " ", err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(400)
-			if err := json.NewEncoder(w).Encode(map[string]string{
-				"msg": "no route",
-			}); err != nil {
-				logrus.Error(err)
-			}
-			return
-		}
-		methodHandlers, ok := h.(actions.MethodHandlers)
-		if !ok {
-			continue
-		}
-
-		handler, ok := methodHandlers[request.Method]
-		if !ok {
-			continue
-		}
-
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		handler.Handle(&request, func(response actions.RestResponse) {
-			defer wg.Done()
-			var method string
-			switch request.Method {
-			case actions.GET:
-				method = "GET"
-			case actions.POST:
-				method = "POST"
-			case actions.PUT:
-				method = "PUT"
-			case actions.DELETE:
-				method = "DELETE"
-			case actions.HEAD:
-				method = "HEAD"
-			default:
-				method = "UNKNOWN"
-			}
-			logrus.Debug("reply on ", method, " ", request.Path)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(response.StatusCode)
-			if err := json.NewEncoder(w).Encode(response.Body); err != nil {
-				logrus.Error(err)
-			}
-		})
-		wg.Wait()
-		return
-	}
 }
 
 func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
@@ -197,7 +109,6 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 
 type Bootstrap struct {
 	s *fasthttp.Server
-	c *RequestController
 }
 
 func New(
@@ -337,11 +248,9 @@ func New(
 	}
 	return &Bootstrap{
 		s: s,
-		c: &c,
 	}
 }
 
 func (b *Bootstrap) Start(port string) error {
 	return b.s.ListenAndServe(port)
-	//return http.ListenAndServe(port, b.c)
 }
