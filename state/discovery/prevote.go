@@ -10,9 +10,10 @@ import (
 )
 
 type PreVoteCollector struct {
-	state    map[state.Node]*PreVoteResponse //tuple
-	preVotes map[state.Node]*PreVoteResponse //map
+	preVotes map[state.Node]*PreVoteResponse
 
+	leader          state.Node
+	response        PreVoteResponse
 	electionStarted bool
 
 	transportService  *transport.Service
@@ -25,7 +26,6 @@ type PreVoteCollector struct {
 func NewPreVoteCollector(transportService *transport.Service, startElection func(), updateMaxTermSeen func(term int64)) *PreVoteCollector {
 
 	p := &PreVoteCollector{
-		state:             make(map[state.Node]*PreVoteResponse),
 		preVotes:          make(map[state.Node]*PreVoteResponse),
 		transportService:  transportService,
 		startElection:     startElection,
@@ -38,9 +38,10 @@ func NewPreVoteCollector(transportService *transport.Service, startElection func
 
 func (p *PreVoteCollector) Start() {
 	localNode := p.transportService.GetLocalNode()
+
 	request := PreVoteRequest{
 		SourceNode: localNode,
-		Term:       p.getPreVoteResponse().CurrentTerm,
+		Term:       p.response.CurrentTerm,
 	}
 
 	_, broadcastNodes := p.transportService.GetConnectedPeers()
@@ -50,8 +51,10 @@ func (p *PreVoteCollector) Start() {
 
 	for _, node := range broadcastNodes {
 		remoteNode := node
-		logrus.Infof("PreVoteRequest%v to DestNode=%v\n", request, remoteNode)
-		go p.transportService.SendRequest(node, transport.PREVOTE_REQ, request.ToBytes(), func(res []byte) {
+		logrus.Infof("PreVoteRequest=%v to DestNode=%v\n", request, remoteNode)
+		// 이게 고루틴이어야 할까?
+		p.transportService.SendRequest(node, transport.PREVOTE_REQ, request.ToBytes(), func(res []byte) {
+			logrus.Info(56, res)
 			data := PreVoteResponseFromBytes(res)
 			logrus.Infof("PreVoteResponse%v from DestNode=%v\n", data, remoteNode)
 			p.handlePreVoteResponse(data, remoteNode)
@@ -61,24 +64,21 @@ func (p *PreVoteCollector) Start() {
 
 func (p *PreVoteCollector) handlePreVoteRequest(channel transport.ReplyChannel, req []byte) {
 
-	preVoteReqData := PreVoteRequestFromBytes(req)
-	logrus.Infof("PreVoteRequest=%v from DestNode={%s}\n", preVoteReqData, channel.GetDestAddress())
+	request := PreVoteRequestFromBytes(req)
+	logrus.Infof("PreVoteRequest=%v from DestNode={%s}\n", request, channel.GetDestAddress())
 
-	p.updateMaxTermSeen(preVoteReqData.Term)
+	p.updateMaxTermSeen(request.Term)
 
-	leader := p.getLeader()
-	preVoteResData := p.state[leader]
+	response := p.response
 
-	// if the current node has not received the information that a node has been elected as the leader
-	if leader != (state.Node{}) {
-		logrus.Infof("Election already finished, won leader=%v", leader)
-		preVoteResData.Err = "Election already finished"
+	if p.leader != (state.Node{}) {
+		logrus.Infof("Election already finished, won leader=%v", p.leader)
+		response.Err = "Election already finished"
 	}
 
-	response := preVoteResData.ToBytes()
-	logrus.Infof("PreVoteResponse%v to DestNode={%s}", preVoteResData, channel.GetDestAddress())
+	logrus.Infof("PreVoteResponse%v to DestNode={%s}", response, channel.GetDestAddress())
 
-	channel.SendMessage(transport.PREVOTE_RES, response)
+	channel.SendMessage(transport.PREVOTE_RES, response.ToBytes())
 }
 
 func (p *PreVoteCollector) handlePreVoteResponse(response *PreVoteResponse, sender state.Node) {
@@ -107,8 +107,8 @@ func (p *PreVoteCollector) handlePreVoteResponse(response *PreVoteResponse, send
 		return
 	}
 
-	if p.getLeader() != (state.Node{}) {
-		logrus.Infof("Already elected leader=%v", p.getLeader())
+	if p.leader != (state.Node{}) {
+		logrus.Infof("Already elected leader=%v", p.leader)
 		return
 	}
 
@@ -120,18 +120,22 @@ func (p *PreVoteCollector) handlePreVoteResponse(response *PreVoteResponse, send
 }
 
 func (p *PreVoteCollector) update(preVoteResponse *PreVoteResponse, leader state.Node) {
-	mutex := sync.RWMutex{}
-	if leader == (state.Node{}) {
-		mutex.Lock()
-		p.state[p.getLeader()] = preVoteResponse
-		mutex.Unlock()
-	} else {
-		mutex.Lock()
-		delete(p.state, p.getLeader())
-		p.state[leader] = preVoteResponse
-		mutex.Unlock()
-	}
-	logrus.Infof("Updating with preVoteResponse=%v, leader=%v\n", preVoteResponse, leader)
+
+	p.leader = leader
+	/*
+		mutex := sync.RWMutex{}
+		if leader == (state.Node{}) {
+			mutex.Lock()
+			p.state[p.getLeader()] = preVoteResponse
+			mutex.Unlock()
+		} else {
+			mutex.Lock()
+			delete(p.state, p.getLeader())
+			p.state[leader] = preVoteResponse
+			mutex.Unlock()
+		}
+	*/
+	// logrus.Infof("Updating with preVoteResponse=%v, leader=%v\n", preVoteResponse, leader)
 
 }
 
@@ -139,21 +143,6 @@ func (p *PreVoteCollector) SetVote(key state.Node, value *PreVoteResponse) {
 	p.Lock.Lock()
 	p.preVotes[key] = value
 	p.Lock.Unlock()
-}
-
-func (p *PreVoteCollector) getLeader() state.Node {
-	var leader state.Node
-	for key, _ := range p.state {
-		leader = key
-	}
-	return leader
-}
-func (p *PreVoteCollector) getPreVoteResponse() *PreVoteResponse {
-	var response *PreVoteResponse
-	for _, value := range p.state {
-		response = value
-	}
-	return response
 }
 
 type PreVoteRequest struct {
@@ -188,10 +177,8 @@ func PreVoteRequestFromBytes(b []byte) *PreVoteRequest {
 }
 
 type PreVoteResponse struct {
-	CurrentTerm      int64
-	lastAcceptedTerm int64
-	// lastAcceptedVersion
-	Err string
+	CurrentTerm int64
+	Err         string
 }
 
 func NewPreVoteResponse(currentTerm int64) *PreVoteResponse {

@@ -9,6 +9,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /app .
 ## Stage :: run
 # run
 FROM ubuntu
+RUN mkdir /data
 COPY --from=builder /app ./
 COPY ./searchgoose.yaml ./
 CMD ["./app"]

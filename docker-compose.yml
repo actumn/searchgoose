@@ -3,7 +3,7 @@ version: "3.1"
 services:
   sg-master-01:
     container_name: sg01
-#    image: searchgoose:latest
+    image: searchgoose:latest
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -14,14 +14,11 @@ services:
     ports:
       - 8180:8180
       - 8080:8080
-    links:
-      - sg-master-02
-      - sg-master-03
     networks:
       - searchgoose
   sg-master-02:
     container_name: sg02
-#    image: searchgoose:latest
+    image: searchgoose:latest
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -33,11 +30,13 @@ services:
     ports:
       - 8179:8180
       - 8081:8080
+    links:
+      - sg-master-01
     networks:
       - searchgoose
   sg-master-03:
     container_name: sg03
-#    image: searchgoose:latest
+    image: searchgoose:latest
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -49,6 +48,8 @@ services:
     ports:
       - 8181:8180
       - 8082:8080
+    links:
+      - sg-master-01
     networks:
       - searchgoose
 networks:

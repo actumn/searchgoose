@@ -67,6 +67,7 @@ func start() {
 
 	// for signal handling
 	var outer chan int
+	var count, length int
 	outer = make(chan int, 1)
 	done := func() {
 		outer <- 1
@@ -80,6 +81,7 @@ func start() {
 	name := viper.GetString("node.name")
 
 	tcpTransport = tcp.NewTransport(tcpPort, seedHost, id)
+	length = len(tcpTransport.GetSeedHosts())
 	transportService := transport.NewService(tcpTransport, name)
 	transportService.Start(tcpPort)
 
@@ -108,14 +110,18 @@ func start() {
 	coordinator.Start()
 	coordinator.StartInitialJoin()
 
-	wait := <-outer
+	for i := 0; i < length; i++ {
+		<-outer
+		count++
+	}
 
 	indexNameExpressionResolver := indices.NewNameExpressionResolver()
 
 	b := http.New(clusterService, clusterMetadataCreateIndexService, clusterMetadataDeleteIndexService, clusterMetadataIndexAliasService, indicesService, transportService, indexNameExpressionResolver)
 	httpPort := ":" + viper.GetString("http.port")
 
-	if wait == 1 {
+	if count == length {
+		logrus.Printf("124 leader=%v")
 		logrus.Info("start server...")
 		coordinator.Started = true
 		if err := b.Start(httpPort); err != nil {
