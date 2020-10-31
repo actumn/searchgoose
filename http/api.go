@@ -9,10 +9,12 @@ import (
 	"github.com/actumn/searchgoose/state/transport"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
+	"sync"
 )
 
 func requestFromCtx(ctx *fasthttp.RequestCtx) actions.RestRequest {
 	request := actions.RestRequest{
+		ID:          ctx.ID(),
 		Path:        string(ctx.Path()),
 		Header:      map[string][]byte{},
 		QueryParams: map[string][]byte{},
@@ -74,14 +76,33 @@ func (c *RequestController) HandleFastHTTP(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 		handler.Handle(&request, func(response actions.RestResponse) {
-			logrus.Debug("reply on ", string(ctx.Method()), " ", request.Path)
+			defer wg.Done()
+			var method string
+			switch request.Method {
+			case actions.GET:
+				method = "GET"
+			case actions.POST:
+				method = "POST"
+			case actions.PUT:
+				method = "PUT"
+			case actions.DELETE:
+				method = "DELETE"
+			case actions.HEAD:
+				method = "HEAD"
+			default:
+				method = "UNKNOWN"
+			}
+			logrus.Debug("reply on ", method, " ", request.Path, " ", ctx.ID())
 			ctx.Response.SetStatusCode(response.StatusCode)
 			ctx.Response.Header.SetCanonical([]byte("Content-Type"), []byte("application/json"))
-			if err := json.NewEncoder(ctx).Encode(response.Body); err != nil {
+			if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(response.Body); err != nil {
 				logrus.Error(err)
 			}
 		})
+		wg.Wait()
 		return
 	}
 }

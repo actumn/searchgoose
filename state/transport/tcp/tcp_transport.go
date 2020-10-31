@@ -10,6 +10,12 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+)
+
+var (
+	requestIdGenerator uint64
 )
 
 type Transport struct {
@@ -20,25 +26,33 @@ type Transport struct {
 }
 
 type Connection struct {
-	conn         net.Conn
-	localAddress string
-	destAddress  string
-	err          string
+	conn             net.Conn
+	localAddress     string
+	destAddress      string
+	err              string
+	responseHandlers map[uint64]func(byte []byte)
+	wLock            sync.Mutex
+	rLock            sync.Mutex
 }
 
 func (c *Connection) SendRequest(action string, content []byte, callback func(byte []byte)) {
+	atomic.AddUint64(&requestIdGenerator, 1)
 
 	request := DataFormat{
+		Id:      requestIdGenerator,
 		Source:  c.GetSourceAddress(),
 		Dest:    c.GetDestAddress(),
 		Action:  action,
 		Content: content,
 	}
+	c.responseHandlers[request.Id] = callback
 	logrus.Infof("Send %s to %s\n", request.Action, request.Dest)
 
-	bytesBuf := request.ToBytes()
+	bytesBuf := request.toBytes()
 	lengthBuf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lengthBuf, uint32(len(bytesBuf)))
+	c.wLock.Lock()
+	defer c.wLock.Unlock()
 	if _, err := c.conn.Write(lengthBuf); err != nil {
 		logrus.Errorf("Failed to send msg length; err: %v", err)
 	}
@@ -46,29 +60,25 @@ func (c *Connection) SendRequest(action string, content []byte, callback func(by
 		logrus.Errorf("Fail to send request; err:%v\n", err)
 	}
 	go func() {
-		recvBuf := make([]byte, 4096)
+		c.rLock.Lock()
+		defer c.rLock.Unlock()
 		lengthBuf := make([]byte, 4)
 		if _, err := c.conn.Read(lengthBuf); err != nil {
 			logrus.Fatalf("Failed to read msg length; err: %v", err)
 		}
 		msgLength := binary.LittleEndian.Uint32(lengthBuf)
-
-		var buf bytes.Buffer
-		for 0 < msgLength {
-			if n, err := c.conn.Read(recvBuf); err != nil {
-				logrus.Fatalf("Fail to get response; err: %v", err)
-			} else if 0 < n {
-				data := recvBuf[:n]
-				buf.Write(data)
-				msgLength -= uint32(n)
-			}
+		recvBuf := make([]byte, int(msgLength))
+		if _, err := io.ReadFull(c.conn, recvBuf); err != nil {
+			logrus.Fatalf("Fail to get response; err: %v", err)
 		}
-		response := DataFormatFromBytes(buf.Bytes())
+		response := dataFormatFromBytes(recvBuf)
 		logrus.Infof("Receive %s from %s\n", response.Action, response.Source)
 		if strings.Contains(response.Action, "_FAIL") {
 			logrus.Warnf("%s", string(response.Content))
 		} else {
-			callback(response.Content)
+			handler := c.responseHandlers[response.Id]
+			delete(c.responseHandlers, response.Id)
+			handler(response.Content)
 		}
 	}()
 }
@@ -86,6 +96,7 @@ func (c *Connection) GetMessage() string {
 }
 
 type ReplyChannel struct {
+	requestId    uint64
 	conn         net.Conn
 	localAddress string
 	destAddress  string
@@ -94,6 +105,7 @@ type ReplyChannel struct {
 func (c *ReplyChannel) SendMessage(action string, content []byte) (n int, err error) {
 
 	request := DataFormat{
+		Id:      c.requestId,
 		Source:  c.GetSourceAddress(),
 		Dest:    c.GetDestAddress(),
 		Action:  action,
@@ -102,7 +114,7 @@ func (c *ReplyChannel) SendMessage(action string, content []byte) (n int, err er
 
 	logrus.Infof("Send %s Reply to %s\n", action, request.Dest)
 
-	bytesBuf := request.ToBytes()
+	bytesBuf := request.toBytes()
 	lengthBuf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lengthBuf, uint32(len(bytesBuf)))
 	if n, err := c.conn.Write(lengthBuf); err != nil {
@@ -172,7 +184,6 @@ func (t *Transport) Start(port int) {
 			}
 			go func(conn net.Conn) {
 				for {
-					recvBuf := make([]byte, 4096)
 					lengthBuf := make([]byte, 4)
 					if _, err := conn.Read(lengthBuf); err != nil {
 						if io.EOF == err {
@@ -183,21 +194,15 @@ func (t *Transport) Start(port int) {
 						return
 					}
 					msgLength := binary.LittleEndian.Uint32(lengthBuf)
-
-					var buf bytes.Buffer
-					for 0 < msgLength {
-						if n, err := conn.Read(recvBuf); err != nil {
-							logrus.Errorf("Fail to get response; err: %v", err)
-							return
-						} else if 0 < n {
-							data := recvBuf[:n]
-							buf.Write(data)
-							msgLength -= uint32(n)
-						}
+					recvBuf := make([]byte, int(msgLength))
+					n, err := io.ReadFull(conn, recvBuf)
+					if err != nil {
+						logrus.Errorf("Fail to get response; err: %v", err)
+						return
 					}
-					if 0 < buf.Len() {
+					if 0 < n {
 						// Receive request data
-						recvData := DataFormatFromBytes(buf.Bytes())
+						recvData := dataFormatFromBytes(recvBuf)
 						action := recvData.Action
 						data := recvData.Content
 
@@ -205,6 +210,7 @@ func (t *Transport) Start(port int) {
 							logrus.Fatalln("Error: %s", string(data))
 						} else {
 							t.RequestHandlers[action](&ReplyChannel{
+								requestId:    recvData.Id,
 								conn:         conn,
 								localAddress: t.LocalAddress,
 								destAddress:  recvData.Source,
@@ -230,9 +236,10 @@ func (t *Transport) OpenConnection(address string, callback func(conn transport.
 	logrus.Info("Success on connecting ", address)
 
 	c := &Connection{
-		conn:         conn,
-		localAddress: t.LocalAddress,
-		destAddress:  address,
+		conn:             conn,
+		localAddress:     t.LocalAddress,
+		destAddress:      address,
+		responseHandlers: map[uint64]func(byte []byte){},
 	}
 	callback(c)
 }
@@ -255,13 +262,14 @@ func (t *Transport) GetHandler(action string) transport.RequestHandler {
 
 // Data Format
 type DataFormat struct {
+	Id      uint64
 	Source  string
 	Dest    string
 	Action  string
 	Content []byte
 }
 
-func (d *DataFormat) ToBytes() []byte {
+func (d *DataFormat) toBytes() []byte {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(d); err != nil {
@@ -270,7 +278,7 @@ func (d *DataFormat) ToBytes() []byte {
 	return buffer.Bytes()
 }
 
-func DataFormatFromBytes(b []byte) *DataFormat {
+func dataFormatFromBytes(b []byte) *DataFormat {
 	buffer := bytes.NewBuffer(b)
 	decoder := gob.NewDecoder(buffer)
 	var data DataFormat

@@ -42,7 +42,7 @@ func (s *Service) RemoveIndex(idx state.Index) {
 func (s *Service) deleteIndexStore(idx state.Index) {
 	// delete index directory here
 	if err := env.RemoveContents("./data/" + idx.Uuid); err != nil {
-		logrus.Fatal(err)
+		logrus.Error(err)
 	}
 }
 
