@@ -129,11 +129,12 @@ func NewRestSearch(clusterService *cluster.Service, indicesService *indices.Serv
 			doc, _ := indexShard.Get(hits.ID)
 			src, _ := flat.Unflatten(doc, nil)
 			hitJson := map[string]interface{}{
-				"_index":  indexName,
-				"_type":   "_doc",
-				"_id":     hits.ID,
-				"_score":  hits.Score,
-				"_source": src,
+				"_index":    indexName,
+				"_type":     "_doc",
+				"_id":       hits.ID,
+				"_score":    hits.Score,
+				"_source":   src,
+				"highlight": hits.Fragments,
 			}
 			if data.MaxScore < hits.Score {
 				data.MaxScore = hits.Score
