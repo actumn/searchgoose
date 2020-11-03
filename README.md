@@ -112,8 +112,8 @@ content-type: application/json
 
 ## Example
 ![alt text](./docs/images/example.png)
-This above image describes Searchgoose test application using [Guttenberg-Search](https://github.com/triestpa/Guttenberg-Search). 
+The above image describes Searchgoose test application using [Guttenberg-Search](https://github.com/triestpa/Guttenberg-Search). 
 
 ## Visualization
 ![alt text](./docs/images/elastic-hq.png)
-This above image describes simplified interface for managing and monitoring Searchgoose clusters by [elasticsearch-HQ](https://github.com/ElasticHQ/elasticsearch-HQ). 
+The above image describes simplified interface for managing and monitoring Searchgoose clusters by [elasticsearch-HQ](https://github.com/ElasticHQ/elasticsearch-HQ). 
