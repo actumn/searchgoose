@@ -21,7 +21,9 @@ func SearchTypeMatch(searchType interface{}) *query.MatchQuery {
 	}
 	queryString := field + ":\"" + message + "\""
 
-	return bleve.NewMatchQuery(queryString)
+	q := bleve.NewMatchQuery(queryString)
+	q.SetField(field)
+	return q
 }
 
 func SearchTypeMatchPhrase(searchType interface{}) *query.PhraseQuery {
