@@ -4,10 +4,16 @@
   <br/>
   <br/>
   <p>
-    🦢 Simple, distributed, lighweight<br>
+    🦢 Simple, distributed, lightweight<br>
     RESTful search engine implementation written in go 🔍
   </p>
   <p>
+    <a href="https://gitter.im/celery-node/community">
+      <img src="https://badges.gitter.im/Join%20Chat.svg"/>
+    </a>
+    <a href="https://goreportcard.com/report/github.com/actumn/searchgoose">
+      <img src="https://goreportcard.com/badge/github.com/gocelery/gocelery"/>
+    </a>
     <a href="https://github.com/actumn/searchgoose/blob/master/LICENSE">
       <img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
     </a>
@@ -15,7 +21,7 @@
 </div>
 
 ---
-## Motivation
+## Introduction
 Searchgoose is simple distributed **RESTful search engine** supporting  searching and indexing data. For Study purposes, mostly understanding the implementation details of how [elasticearch](https://github.com/elastic/elasticsearch) is built, focusing on clustering distributed system and supporting full-text search using [bleve](https://github.com/blevesearch/bleve). Searchgoose aims to provide fast and flexible data handling by solving the problems of the existing relational database, which is bothering tasks to search and divide string data. To solve this problem, this project uses a data structure called an **inverted index** that supports fast full-text searches. It also implements raft-like algorithm and quorum-based voting system for discovery and election service in clustering mode.
 
 ## Architecture

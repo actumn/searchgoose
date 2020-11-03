@@ -40,7 +40,7 @@ func init() {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		logrus.warn("fatal error config file: searchgoose", err)
+		logrus.Warn("error finding config file: searchgoose", err)
 	}
 
 	seedHosts := flag.String("seed_hosts", "", "연결할 노드들")
