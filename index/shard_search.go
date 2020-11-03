@@ -12,7 +12,12 @@ func SearchTypeMatch(searchType interface{}) *query.MatchQuery {
 	var field, message string
 	for key, value := range m {
 		field = key
-		message = value.(string)
+		switch v := value.(type) {
+		case string:
+			message = v
+		case map[string]interface{}:
+			message = v["query"].(string)
+		}
 	}
 	queryString := field + ":\"" + message + "\""
 
@@ -24,7 +29,12 @@ func SearchTypeMatchPhrase(searchType interface{}) *query.PhraseQuery {
 	var field, message string
 	for key, value := range m {
 		field = key
-		message = value.(string)
+		switch v := value.(type) {
+		case string:
+			message = v
+		case map[string]interface{}:
+			message = v["query"].(string)
+		}
 	}
 
 	return bleve.NewPhraseQuery(strings.Fields(strings.ToLower(message)), field)
@@ -35,7 +45,12 @@ func SearchTypePrefix(searchType interface{}) *query.PrefixQuery {
 	var _, message string
 	for key, value := range m {
 		_ = key
-		message = value.(string)
+		switch v := value.(type) {
+		case string:
+			message = v
+		case map[string]interface{}:
+			message = v["query"].(string)
+		}
 	}
 
 	return bleve.NewPrefixQuery(strings.ToLower(message))
