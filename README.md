@@ -4,8 +4,8 @@
   <br/>
   <br/>
   <p>
-    Simple, distributed, lighweight<br>
-    RESTful search engine implementation written in go
+    🦢 Simple, distributed, lighweight<br>
+    RESTful search engine implementation written in go 🔍
   </p>
   <p>
     <a href="https://github.com/actumn/searchgoose/blob/master/LICENSE">
@@ -16,14 +16,36 @@
 
 ---
 ## Motivation
+Searchgoose is simple distributed **RESTful search engine** supporting  searching and indexing data. For Study purposes, mostly understanding the implementation details of how [elasticearch](https://github.com/elastic/elasticsearch) is built, focusing on clustering distributed system and supporting full-text search using [bleve](https://github.com/blevesearch/bleve). Searchgoose aims to provide fast and flexible data handling by solving the problems of the existing relational database, which is bothering tasks to search and divide string data. To solve this problem, this project uses a data structure called an **inverted index** that supports fast full-text searches. It also implements raft-like algorithm and quorum-based voting system for discovery and election service in clustering mode.
 
-Study purposes, mostly for understanding the implementation details of how
-[elasticearch](https://github.com/elastic/elasticsearch) is built, focusing on clustering distributed system and supporting full-text search using [bleve](https://github.com/blevesearch/bleve).
+## Architecture
+![alt text](./docs/images/architecture01.png)
+
+![alt text](./docs/images/architecture02.png)
+
+## REST API
+### Cluster API
+- [/_nodes](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-info.html)
+- [/_nodes/stats](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-stats.html)
+- [/_cluster/health](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-health.html)
+- [/_cluster/state](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html)
+- [/_cluster/stats](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-stats.html)
+
+### Index / Document API
+- [/{index}](https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-get-index.html)
+- [/{index}/_doc](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-get.html)
+- [/{index}/_search](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-search.html)
+- [/{index}/_refresh](https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-refresh.html)
 
 ## Build 
-### Docker
+### DockerFile
 ```shell script
 $ docker build . --rm --tag searchgoose:latest
+```
+
+### Makefile
+```shell script
+$ make build
 ```
 
 ## Run
@@ -38,8 +60,12 @@ $ go run main.go -node.name=sg-node-02 -seed_hosts=127.0.0.1:8180 -transport.por
 $ go run main.go -node.name=sg-node-03 -seed_hosts=127.0.0.1:8180 -transport.port=8181 -http.port=8082
 ```
 
+
 ## API
+To try any of the below queries you can use the above example quries
+
 ### Create Index
+
 ```
 PUT /test15
 content-type: application/json
@@ -83,3 +109,11 @@ content-type: application/json
   }
 }
 ```
+
+## Example
+![alt text](./docs/images/example.png)
+This above image describes Searchgoose test application using [Guttenberg-Search](https://github.com/triestpa/Guttenberg-Search). 
+
+## Visualization
+![alt text](./docs/images/elastic-hq.png)
+This above image describes simplified interface for managing and monitoring Searchgoose clusters by [elasticsearch-HQ](https://github.com/ElasticHQ/elasticsearch-HQ). 
