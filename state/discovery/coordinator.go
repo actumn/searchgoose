@@ -98,7 +98,7 @@ func (c *Coordinator) Start() {
 	c.PeerFinder = NewCoordinatorPeerFinder(c)
 	c.PeerFinder.currentTerm = c.getCurrentTerm()
 
-	c.PreVoteCollector.state[state.Node{}] = NewPreVoteResponse(c.getCurrentTerm())
+	// c.PreVoteCollector.state[state.Node{}] = NewPreVoteResponse(c.getCurrentTerm())
 
 	c.ClusterApplierService.ClusterState = c.ApplierState
 	c.MasterService.ClusterState = c.ApplierState
@@ -306,8 +306,15 @@ func (c *Coordinator) handlePublish(channel transport.ReplyChannel, req []byte) 
 	// handle publish
 	acceptedState := state.ClusterStateFromBytes(req, c.TransportService.GetLocalNode())
 	//localState := c.CoordinationState.PersistedState.GetLastAcceptedState()
-	logrus.Info("accept new state from leader=%v", acceptedState.Nodes.MasterNode())
+	leader := acceptedState.Nodes.MasterNode()
+	logrus.Info("accept new state from leader=%v", leader)
 	c.CoordinationState.PersistedState.SetLastAcceptedState(acceptedState)
+
+	if c.TransportService.GetLocalNode() != leader {
+		c.mode = FOLLOWER
+		c.PeerFinder.deactivate(leader)
+		c.PreVoteCollector.update(NewPreVoteResponse(c.getCurrentTerm()), leader)
+	}
 
 	// handle commit
 	c.ApplierState = acceptedState
@@ -321,7 +328,7 @@ func (c *Coordinator) handlePublish(channel transport.ReplyChannel, req []byte) 
 	if c.Started == false {
 		c.Done()
 	}
-
+	logrus.Printf("324 currentTerm={%d}", c.getCurrentTerm())
 	channel.SendMessage(transport.PUBLISH_ACK, []byte{})
 }
 

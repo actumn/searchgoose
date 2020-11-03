@@ -131,12 +131,12 @@ func (s *Service) ConnectToRemoteNode(address string, callback func(node *state.
 	curNode := s.LocalNode
 
 	if curNode.HostAddress == address {
-		logrus.Infof("ConnectToRemoteNode(%s) not connecting local node ", address)
+		// logrus.Infof("ConnectToRemoteNode(%s) not connecting local node ", address)
 		return
 	}
 
 	if node := s.GetNodeByAddress(address); node != nil {
-		logrus.Infof("Connection is already established; %s", address)
+		// logrus.Infof("Connection is already established; %s", address)
 		callback(node)
 		return
 	}

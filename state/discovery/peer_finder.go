@@ -92,14 +92,9 @@ func (f *CoordinatorPeerFinder) startProbe(address string) {
 func (f *CoordinatorPeerFinder) createConnection(address string) {
 	f.transportService.ConnectToRemoteNode(address, func(remoteNode *state.Node) {
 		if remoteNode == nil {
-			// 만약 두 개의 seedhost가 있고, 하나는 커낵션이 안 되어 있고,
-			// 나머지 하나가 master였다면?
-
 			if f.Coordinator.active == false {
 				f.Coordinator.becomeLeader("createConnection")
 			}
-
-			//done()
 			return
 		}
 		f.PeersByAddress[address] = remoteNode
@@ -139,8 +134,9 @@ func (f *CoordinatorPeerFinder) requestPeers(destNode state.Node, next func()) {
 				f.onActiveMasterFound(destNode, term)
 			} else {
 				f.startProbe(master.HostAddress)
-				f.Coordinator.becomeFollower("requestPeers", master)
+				//f.Coordinator.becomeFollower("requestPeers", master)
 			}
+			return
 		}
 
 		for _, peer := range peers {
