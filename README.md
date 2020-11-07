@@ -8,7 +8,7 @@
     RESTful search engine implementation written in go 🔍
   </p>
   <p>
-    <a href="https://gitter.im/celery-node/community">
+    <a href="https://gitter.im/searchgoose/community">
       <img src="https://badges.gitter.im/Join%20Chat.svg"/>
     </a>
     <a href="https://goreportcard.com/report/github.com/actumn/searchgoose">
